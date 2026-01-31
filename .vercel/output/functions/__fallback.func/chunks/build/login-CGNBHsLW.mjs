@@ -16,8 +16,6 @@ import 'node:url';
 import 'seroval';
 import 'seroval-plugins/web';
 import 'solid-js';
-import 'rou3';
-import 'srvx';
 
 const E = E$1(async (e) => {
   const { db: i } = await import('./index-BinUX9hy.mjs'), { users: n } = await import('./schema-DxiP6MVG.mjs').then((s) => s.a), { eq: a } = await import('drizzle-orm'), c = await import('bcryptjs'), { getEvent: m, setCookie: u } = await import('../nitro/nitro.mjs').then(function (n) { return n.h; }).then((s) => s.h), r = String(e.get("username")), p = String(e.get("password"));

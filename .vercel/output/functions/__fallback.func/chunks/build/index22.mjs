@@ -18,8 +18,6 @@ import 'node:url';
 import 'seroval';
 import 'seroval-plugins/web';
 import 'solid-js/web/storage';
-import 'rou3';
-import 'srvx';
 import './server-fns-runtime-DJML9_-T.mjs';
 import './index-BinUX9hy2.mjs';
 import 'drizzle-orm/postgres-js';

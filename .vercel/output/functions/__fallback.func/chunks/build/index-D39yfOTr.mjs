@@ -16,8 +16,6 @@ import 'node:url';
 import 'seroval';
 import 'seroval-plugins/web';
 import 'solid-js';
-import 'rou3';
-import 'srvx';
 
 const p = E(async () => {
   const { getUser: e } = await import('./session-D_Gl5yQj.mjs');

@@ -15,8 +15,6 @@ import 'seroval';
 import 'seroval-plugins/web';
 import 'solid-js';
 import 'solid-js/web/storage';
-import 'rou3';
-import 'srvx';
 
 var i = ["<main", "><!--$-->", "<!--/--><h1>About</h1></main>"];
 function s() {

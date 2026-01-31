@@ -19,8 +19,6 @@ import 'node:url';
 import 'seroval';
 import 'seroval-plugins/web';
 import 'solid-js/web/storage';
-import 'rou3';
-import 'srvx';
 
 const B = (t) => (r) => {
   const { base: o } = r, n = children(() => r.children), e = createMemo(() => Oe(n(), r.base || ""));
@@ -213,4 +211,4 @@ ${escape(r.stack)}`), get children() {
 }
 
 export { qt as default };
-//# sourceMappingURL=app-DdXtN6Nq.mjs.map
+//# sourceMappingURL=app-C76_G7l3.mjs.map

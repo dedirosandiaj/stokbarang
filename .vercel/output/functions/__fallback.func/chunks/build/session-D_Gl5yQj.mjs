@@ -19,8 +19,6 @@ import 'node:url';
 import 'seroval';
 import 'seroval-plugins/web';
 import 'solid-js';
-import 'rou3';
-import 'srvx';
 import 'drizzle-orm/postgres-js';
 import 'postgres';
 import 'drizzle-orm/pg-core';

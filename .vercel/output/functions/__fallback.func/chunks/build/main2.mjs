@@ -16,8 +16,6 @@ import 'node:url';
 import 'seroval';
 import 'seroval-plugins/web';
 import 'solid-js/web/storage';
-import 'rou3';
-import 'srvx';
 
 function m() {
   return createComponent(A, { href: "/dashboard" });

@@ -15,8 +15,6 @@ import 'seroval';
 import 'seroval-plugins/web';
 import 'solid-js';
 import 'solid-js/web/storage';
-import 'rou3';
-import 'srvx';
 
 var i = ["<main", "><!--$-->", "<!--/--><!--$-->", '<!--/--><h1>Page Not Found</h1><p>Visit <a href="https://start.solidjs.com" target="_blank">start.solidjs.com</a> to learn how to build SolidStart apps.</p></main>'];
 function l() {

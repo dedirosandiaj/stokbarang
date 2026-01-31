@@ -16,8 +16,6 @@ import 'vinxi/lib/path';
 import 'node:url';
 import 'seroval';
 import 'seroval-plugins/web';
-import 'rou3';
-import 'srvx';
 
 var S = ["<div", ' class="flex items-center justify-center min-h-screen bg-gray-100"><!--$-->', '<!--/--><div class="p-8 bg-white rounded shadow-md w-96 relative"><h1 class="mb-6 text-2xl font-bold text-center">Login</h1><form', ' method="post" class="flex flex-col gap-4"><div><label class="block mb-2 text-sm font-bold text-gray-700">Username</label><input type="text" name="username" class="w-full px-3 py-2 border rounded shadow appearance-none focus:outline-none focus:shadow-outline" required></div><div><label class="block mb-2 text-sm font-bold text-gray-700">Password</label><input type="password" name="password" class="w-full px-3 py-2 border rounded shadow appearance-none focus:outline-none focus:shadow-outline" required></div><!--$-->', '<!--/--><button type="submit"', ' class="', '">', "</button></form></div></div>"], _ = ["<div", ' class="text-red-500 text-sm font-bold text-center">', "</div>"];
 const $ = E(async (e) => {

@@ -346,7 +346,7 @@
     ]
   },
   "virtual:$vinxi/handler/client": {
-    "file": "assets/client-DeqmpdKB.js",
+    "file": "assets/client-C_GcLkmU.js",
     "name": "client",
     "src": "virtual:$vinxi/handler/client",
     "isEntry": true,
@@ -379,7 +379,7 @@
       "src/routes/index.tsx?pick=default&pick=$css"
     ],
     "css": [
-      "assets/client-WNa2LR0V.css"
+      "assets/client-DojVWHVh.css"
     ]
   }
 }

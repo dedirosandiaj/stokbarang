@@ -22,8 +22,6 @@ import 'vinxi/lib/path';
 import 'node:url';
 import 'seroval';
 import 'seroval-plugins/web';
-import 'rou3';
-import 'srvx';
 import './index-BinUX9hy.mjs';
 import 'drizzle-orm/postgres-js';
 import 'postgres';

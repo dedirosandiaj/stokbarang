@@ -15,6 +15,4 @@ import 'seroval-plugins/web';
 import 'solid-js';
 import 'solid-js/web';
 import 'solid-js/web/storage';
-import 'rou3';
-import 'srvx';
 //# sourceMappingURL=index.mjs.map

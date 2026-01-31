@@ -14,8 +14,6 @@ import { CustomEventPlugin, DOMExceptionPlugin, EventPlugin, FormDataPlugin, Hea
 import { sharedConfig, lazy, createComponent, createUniqueId, useContext, createRenderEffect, onCleanup, createContext as createContext$1, createMemo, createSignal, on, runWithOwner, getOwner, startTransition, resetErrorBoundaries, batch, untrack, $TRACK, getListener, catchError, ErrorBoundary, Suspense, children, Show, createRoot } from 'solid-js';
 import { renderToString, isServer, getRequestEvent, ssrElement, escape, mergeProps, ssr, createComponent as createComponent$1, useAssets, spread, ssrHydrationKey, renderToStream, NoHydration, Hydration, ssrAttribute, HydrationScript, delegateEvents } from 'solid-js/web';
 import { provideRequestEvent } from 'solid-js/web/storage';
-import { NullProtoObj } from 'rou3';
-import { FastURL, FastResponse } from 'srvx';
 
 const suspectProtoRx = /"(?:_|\\u0{2}5[Ff]){2}(?:p|\\u0{2}70)(?:r|\\u0{2}72)(?:o|\\u0{2}6[Ff])(?:t|\\u0{2}74)(?:o|\\u0{2}6[Ff])(?:_|\\u0{2}5[Ff]){2}"\s*:/;
 const suspectConstructorRx = /"(?:c|\\u0063)(?:o|\\u006[Ff])(?:n|\\u006[Ee])(?:s|\\u0073)(?:t|\\u0074)(?:r|\\u0072)(?:u|\\u0075)(?:c|\\u0063)(?:t|\\u0074)(?:o|\\u006[Ff])(?:r|\\u0072)"\s*:/;
@@ -302,6 +300,211 @@ function stringifyParsedURL(parsed) {
   const host = parsed.host || "";
   const proto = parsed.protocol || parsed[protocolRelative] ? (parsed.protocol || "") + "//" : "";
   return proto + auth + host + pathname + search + hash;
+}
+
+function parse(str, options) {
+  if (typeof str !== "string") {
+    throw new TypeError("argument str must be a string");
+  }
+  const obj = {};
+  const opt = {};
+  const dec = opt.decode || decode;
+  let index = 0;
+  while (index < str.length) {
+    const eqIdx = str.indexOf("=", index);
+    if (eqIdx === -1) {
+      break;
+    }
+    let endIdx = str.indexOf(";", index);
+    if (endIdx === -1) {
+      endIdx = str.length;
+    } else if (endIdx < eqIdx) {
+      index = str.lastIndexOf(";", eqIdx - 1) + 1;
+      continue;
+    }
+    const key = str.slice(index, eqIdx).trim();
+    if (opt?.filter && !opt?.filter(key)) {
+      index = endIdx + 1;
+      continue;
+    }
+    if (void 0 === obj[key]) {
+      let val = str.slice(eqIdx + 1, endIdx).trim();
+      if (val.codePointAt(0) === 34) {
+        val = val.slice(1, -1);
+      }
+      obj[key] = tryDecode(val, dec);
+    }
+    index = endIdx + 1;
+  }
+  return obj;
+}
+function decode(str) {
+  return str.includes("%") ? decodeURIComponent(str) : str;
+}
+function tryDecode(str, decode2) {
+  try {
+    return decode2(str);
+  } catch {
+    return str;
+  }
+}
+
+const fieldContentRegExp = /^[\u0009\u0020-\u007E\u0080-\u00FF]+$/;
+function serialize$1(name, value, options) {
+  const opt = options || {};
+  const enc = opt.encode || encodeURIComponent;
+  if (typeof enc !== "function") {
+    throw new TypeError("option encode is invalid");
+  }
+  if (!fieldContentRegExp.test(name)) {
+    throw new TypeError("argument name is invalid");
+  }
+  const encodedValue = enc(value);
+  if (encodedValue && !fieldContentRegExp.test(encodedValue)) {
+    throw new TypeError("argument val is invalid");
+  }
+  let str = name + "=" + encodedValue;
+  if (void 0 !== opt.maxAge && opt.maxAge !== null) {
+    const maxAge = opt.maxAge - 0;
+    if (Number.isNaN(maxAge) || !Number.isFinite(maxAge)) {
+      throw new TypeError("option maxAge is invalid");
+    }
+    str += "; Max-Age=" + Math.floor(maxAge);
+  }
+  if (opt.domain) {
+    if (!fieldContentRegExp.test(opt.domain)) {
+      throw new TypeError("option domain is invalid");
+    }
+    str += "; Domain=" + opt.domain;
+  }
+  if (opt.path) {
+    if (!fieldContentRegExp.test(opt.path)) {
+      throw new TypeError("option path is invalid");
+    }
+    str += "; Path=" + opt.path;
+  }
+  if (opt.expires) {
+    if (!isDate(opt.expires) || Number.isNaN(opt.expires.valueOf())) {
+      throw new TypeError("option expires is invalid");
+    }
+    str += "; Expires=" + opt.expires.toUTCString();
+  }
+  if (opt.httpOnly) {
+    str += "; HttpOnly";
+  }
+  if (opt.secure) {
+    str += "; Secure";
+  }
+  if (opt.priority) {
+    const priority = typeof opt.priority === "string" ? opt.priority.toLowerCase() : opt.priority;
+    switch (priority) {
+      case "low": {
+        str += "; Priority=Low";
+        break;
+      }
+      case "medium": {
+        str += "; Priority=Medium";
+        break;
+      }
+      case "high": {
+        str += "; Priority=High";
+        break;
+      }
+      default: {
+        throw new TypeError("option priority is invalid");
+      }
+    }
+  }
+  if (opt.sameSite) {
+    const sameSite = typeof opt.sameSite === "string" ? opt.sameSite.toLowerCase() : opt.sameSite;
+    switch (sameSite) {
+      case true: {
+        str += "; SameSite=Strict";
+        break;
+      }
+      case "lax": {
+        str += "; SameSite=Lax";
+        break;
+      }
+      case "strict": {
+        str += "; SameSite=Strict";
+        break;
+      }
+      case "none": {
+        str += "; SameSite=None";
+        break;
+      }
+      default: {
+        throw new TypeError("option sameSite is invalid");
+      }
+    }
+  }
+  if (opt.partitioned) {
+    str += "; Partitioned";
+  }
+  return str;
+}
+function isDate(val) {
+  return Object.prototype.toString.call(val) === "[object Date]" || val instanceof Date;
+}
+
+function parseSetCookie$1(setCookieValue, options) {
+  const parts = (setCookieValue || "").split(";").filter((str) => typeof str === "string" && !!str.trim());
+  const nameValuePairStr = parts.shift() || "";
+  const parsed = _parseNameValuePair$1(nameValuePairStr);
+  const name = parsed.name;
+  let value = parsed.value;
+  try {
+    value = options?.decode === false ? value : (options?.decode || decodeURIComponent)(value);
+  } catch {
+  }
+  const cookie = {
+    name,
+    value
+  };
+  for (const part of parts) {
+    const sides = part.split("=");
+    const partKey = (sides.shift() || "").trimStart().toLowerCase();
+    const partValue = sides.join("=");
+    switch (partKey) {
+      case "expires": {
+        cookie.expires = new Date(partValue);
+        break;
+      }
+      case "max-age": {
+        cookie.maxAge = Number.parseInt(partValue, 10);
+        break;
+      }
+      case "secure": {
+        cookie.secure = true;
+        break;
+      }
+      case "httponly": {
+        cookie.httpOnly = true;
+        break;
+      }
+      case "samesite": {
+        cookie.sameSite = partValue;
+        break;
+      }
+      default: {
+        cookie[partKey] = partValue;
+      }
+    }
+  }
+  return cookie;
+}
+function _parseNameValuePair$1(nameValuePairStr) {
+  let name = "";
+  let value = "";
+  const nameValueArr = nameValuePairStr.split("=");
+  if (nameValueArr.length > 1) {
+    name = nameValueArr.shift();
+    value = nameValueArr.join("=");
+  } else {
+    value = nameValuePairStr;
+  }
+  return { name, value };
 }
 
 const NODE_TYPES = {
@@ -622,10 +825,10 @@ class H3Error extends Error {
   toJSON() {
     const obj = {
       message: this.message,
-      statusCode: sanitizeStatusCode$1(this.statusCode, 500)
+      statusCode: sanitizeStatusCode(this.statusCode, 500)
     };
     if (this.statusMessage) {
-      obj.statusMessage = sanitizeStatusMessage$1(this.statusMessage);
+      obj.statusMessage = sanitizeStatusMessage(this.statusMessage);
     }
     if (this.data !== void 0) {
       obj.data = this.data;
@@ -661,9 +864,9 @@ function createError$1(input) {
     err.data = input.data;
   }
   if (input.statusCode) {
-    err.statusCode = sanitizeStatusCode$1(input.statusCode, err.statusCode);
+    err.statusCode = sanitizeStatusCode(input.statusCode, err.statusCode);
   } else if (input.status) {
-    err.statusCode = sanitizeStatusCode$1(input.status, err.statusCode);
+    err.statusCode = sanitizeStatusCode(input.status, err.statusCode);
   }
   if (input.statusMessage) {
     err.statusMessage = input.statusMessage;
@@ -672,7 +875,7 @@ function createError$1(input) {
   }
   if (err.statusMessage) {
     const originalMessage = err.statusMessage;
-    const sanitizedMessage = sanitizeStatusMessage$1(err.statusMessage);
+    const sanitizedMessage = sanitizeStatusMessage(err.statusMessage);
     if (sanitizedMessage !== originalMessage) {
       console.warn(
         "[h3] Please prefer using `message` for longer error messages instead of `statusMessage`. In the future, `statusMessage` will be sanitized by default."
@@ -705,7 +908,7 @@ function sendError(event, error, debug) {
     return;
   }
   const _code = Number.parseInt(h3Error.statusCode);
-  setResponseStatus$1(event, _code, h3Error.statusMessage);
+  setResponseStatus(event, _code, h3Error.statusMessage);
   event.node.res.setHeader("content-type", MIMES.json);
   event.node.res.end(JSON.stringify(responseBody, void 0, 2));
 }
@@ -738,7 +941,12 @@ function getRequestHeaders(event) {
   }
   return _headers;
 }
-function getRequestHost$1(event, opts = {}) {
+function getRequestHeader(event, name) {
+  const headers = getRequestHeaders(event);
+  const value = headers[name.toLowerCase()];
+  return value;
+}
+function getRequestHost(event, opts = {}) {
   if (opts.xForwardedHost) {
     const _header = event.node.req.headers["x-forwarded-host"];
     const xForwardedHost = (_header || "").split(",").shift()?.trim();
@@ -748,20 +956,34 @@ function getRequestHost$1(event, opts = {}) {
   }
   return event.node.req.headers.host || "localhost";
 }
-function getRequestProtocol$1(event, opts = {}) {
+function getRequestProtocol(event, opts = {}) {
   if (opts.xForwardedProto !== false && event.node.req.headers["x-forwarded-proto"] === "https") {
     return "https";
   }
   return event.node.req.connection?.encrypted ? "https" : "http";
 }
-function getRequestURL$1(event, opts = {}) {
-  const host = getRequestHost$1(event, opts);
-  const protocol = getRequestProtocol$1(event, opts);
+function getRequestURL(event, opts = {}) {
+  const host = getRequestHost(event, opts);
+  const protocol = getRequestProtocol(event, opts);
   const path = (event.node.req.originalUrl || event.path).replace(
     /^[/\\]+/g,
     "/"
   );
   return new URL(path, `${protocol}://${host}`);
+}
+function getRequestIP(event, opts = {}) {
+  if (event.context.clientAddress) {
+    return event.context.clientAddress;
+  }
+  if (opts.xForwardedFor) {
+    const xForwardedFor = getRequestHeader(event, "x-forwarded-for")?.split(",").shift()?.trim();
+    if (xForwardedFor) {
+      return xForwardedFor;
+    }
+  }
+  if (event.node.req.socket.remoteAddress) {
+    return event.node.req.socket.remoteAddress;
+  }
 }
 
 const RawBodySymbol = Symbol.for("h3RawBody");
@@ -834,7 +1056,7 @@ function readRawBody(event, encoding = "utf8") {
   const result = encoding ? promise.then((buff) => buff.toString(encoding)) : promise;
   return result;
 }
-function getRequestWebStream$1(event) {
+function getRequestWebStream(event) {
   if (!PayloadMethods$1.includes(event.method)) {
     return;
   }
@@ -906,11 +1128,11 @@ const MIMES = {
   json: "application/json"
 };
 
-const DISALLOWED_STATUS_CHARS$1 = /[^\u0009\u0020-\u007E]/g;
-function sanitizeStatusMessage$1(statusMessage = "") {
-  return statusMessage.replace(DISALLOWED_STATUS_CHARS$1, "");
+const DISALLOWED_STATUS_CHARS = /[^\u0009\u0020-\u007E]/g;
+function sanitizeStatusMessage(statusMessage = "") {
+  return statusMessage.replace(DISALLOWED_STATUS_CHARS, "");
 }
-function sanitizeStatusCode$1(statusCode, defaultStatusCode = 200) {
+function sanitizeStatusCode(statusCode, defaultStatusCode = 200) {
   if (!statusCode) {
     return defaultStatusCode;
   }
@@ -921,6 +1143,47 @@ function sanitizeStatusCode$1(statusCode, defaultStatusCode = 200) {
     return defaultStatusCode;
   }
   return statusCode;
+}
+
+function getDistinctCookieKey(name, opts) {
+  return [name, opts.domain || "", opts.path || "/"].join(";");
+}
+
+function parseCookies(event) {
+  return parse(event.node.req.headers.cookie || "");
+}
+function getCookie(event, name) {
+  return parseCookies(event)[name];
+}
+function setCookie(event, name, value, serializeOptions = {}) {
+  if (!serializeOptions.path) {
+    serializeOptions = { path: "/", ...serializeOptions };
+  }
+  const newCookie = serialize$1(name, value, serializeOptions);
+  const currentCookies = splitCookiesString(
+    event.node.res.getHeader("set-cookie")
+  );
+  if (currentCookies.length === 0) {
+    event.node.res.setHeader("set-cookie", newCookie);
+    return;
+  }
+  const newCookieKey = getDistinctCookieKey(name, serializeOptions);
+  event.node.res.removeHeader("set-cookie");
+  for (const cookie of currentCookies) {
+    const parsed = parseSetCookie$1(cookie);
+    const key = getDistinctCookieKey(parsed.name, parsed);
+    if (key === newCookieKey) {
+      continue;
+    }
+    event.node.res.appendHeader("set-cookie", cookie);
+  }
+  event.node.res.appendHeader("set-cookie", newCookie);
+}
+function deleteCookie(event, name, serializeOptions) {
+  setCookie(event, name, "", {
+    ...serializeOptions,
+    maxAge: 0
+  });
 }
 function splitCookiesString(cookiesString) {
   if (Array.isArray(cookiesString)) {
@@ -999,31 +1262,37 @@ function sendNoContent(event, code) {
   if (!code && event.node.res.statusCode !== 200) {
     code = event.node.res.statusCode;
   }
-  const _code = sanitizeStatusCode$1(code, 204);
+  const _code = sanitizeStatusCode(code, 204);
   if (_code === 204) {
     event.node.res.removeHeader("content-length");
   }
   event.node.res.writeHead(_code);
   event.node.res.end();
 }
-function setResponseStatus$1(event, code, text) {
+function setResponseStatus(event, code, text) {
   if (code) {
-    event.node.res.statusCode = sanitizeStatusCode$1(
+    event.node.res.statusCode = sanitizeStatusCode(
       code,
       event.node.res.statusCode
     );
   }
   if (text) {
-    event.node.res.statusMessage = sanitizeStatusMessage$1(text);
+    event.node.res.statusMessage = sanitizeStatusMessage(text);
   }
+}
+function getResponseStatus(event) {
+  return event.node.res.statusCode;
+}
+function getResponseStatusText(event) {
+  return event.node.res.statusMessage;
 }
 function defaultContentType(event, type) {
   if (type && event.node.res.statusCode !== 304 && !event.node.res.getHeader("content-type")) {
     event.node.res.setHeader("content-type", type);
   }
 }
-function sendRedirect$1(event, location, code = 302) {
-  event.node.res.statusCode = sanitizeStatusCode$1(
+function sendRedirect(event, location, code = 302) {
+  event.node.res.statusCode = sanitizeStatusCode(
     code,
     event.node.res.statusCode
   );
@@ -1032,7 +1301,10 @@ function sendRedirect$1(event, location, code = 302) {
   const html = `<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; url=${encodedLoc}"></head></html>`;
   return send(event, html, MIMES.html);
 }
-function getResponseHeader$1(event, name) {
+function getResponseHeaders(event) {
+  return event.node.res.getHeaders();
+}
+function getResponseHeader(event, name) {
   return event.node.res.getHeader(name);
 }
 function setResponseHeaders(event, headers) {
@@ -1044,6 +1316,24 @@ function setResponseHeaders(event, headers) {
   }
 }
 const setHeaders = setResponseHeaders;
+function setResponseHeader(event, name, value) {
+  event.node.res.setHeader(name, value);
+}
+const setHeader = setResponseHeader;
+function appendResponseHeader(event, name, value) {
+  let current = event.node.res.getHeader(name);
+  if (!current) {
+    event.node.res.setHeader(name, value);
+    return;
+  }
+  if (!Array.isArray(current)) {
+    current = [current.toString()];
+  }
+  event.node.res.setHeader(name, [...current, value]);
+}
+function removeResponseHeader(event, name) {
+  return event.node.res.removeHeader(name);
+}
 function isStream(data) {
   if (!data || typeof data !== "object") {
     return false;
@@ -1114,13 +1404,13 @@ function sendWebResponse(event, response) {
     }
   }
   if (response.status) {
-    event.node.res.statusCode = sanitizeStatusCode$1(
+    event.node.res.statusCode = sanitizeStatusCode(
       response.status,
       event.node.res.statusCode
     );
   }
   if (response.statusText) {
-    event.node.res.statusMessage = sanitizeStatusMessage$1(response.statusText);
+    event.node.res.statusMessage = sanitizeStatusMessage(response.statusText);
   }
   if (response.redirected) {
     event.node.res.setHeader("location", response.url);
@@ -1148,14 +1438,14 @@ async function proxyRequest(event, target, opts = {}) {
   let duplex;
   if (PayloadMethods.has(event.method)) {
     if (opts.streamRequest) {
-      body = getRequestWebStream$1(event);
+      body = getRequestWebStream(event);
       duplex = "half";
     } else {
       body = await readRawBody(event, false).catch(() => void 0);
     }
   }
   const method = opts.fetchOptions?.method || event.method;
-  const fetchHeaders = mergeHeaders$2(
+  const fetchHeaders = mergeHeaders$1(
     getProxyRequestHeaders(event, { host: target.startsWith("/") }),
     opts.fetchOptions?.headers,
     opts.headers
@@ -1187,11 +1477,11 @@ async function sendProxy(event, target, opts = {}) {
       cause: error
     });
   }
-  event.node.res.statusCode = sanitizeStatusCode$1(
+  event.node.res.statusCode = sanitizeStatusCode(
     response.status,
     event.node.res.statusCode
   );
-  event.node.res.statusMessage = sanitizeStatusMessage$1(response.statusText);
+  event.node.res.statusMessage = sanitizeStatusMessage(response.statusText);
   const cookies = [];
   for (const [key, value] of response.headers.entries()) {
     if (key === "content-encoding") {
@@ -1298,7 +1588,7 @@ function rewriteCookieProperty(header, map, property) {
     }
   );
 }
-function mergeHeaders$2(defaults, ...inputs) {
+function mergeHeaders$1(defaults, ...inputs) {
   const _inputs = inputs.filter(Boolean);
   if (_inputs.length === 0) {
     return defaults;
@@ -1315,7 +1605,7 @@ function mergeHeaders$2(defaults, ...inputs) {
   return merged;
 }
 
-let H3Event$1 = class H3Event {
+class H3Event {
   "__is_event__" = true;
   // Context
   node;
@@ -1378,12 +1668,12 @@ let H3Event$1 = class H3Event {
   get res() {
     return this.node.res;
   }
-};
+}
 function isEvent(input) {
   return hasProp(input, "__is_event__");
 }
 function createEvent(req, res) {
-  return new H3Event$1(req, res);
+  return new H3Event(req, res);
 }
 function _normalizeNodeHeaders(nodeHeaders) {
   const headers = new Headers();
@@ -1437,7 +1727,7 @@ async function _callHandler(event, handler, hooks) {
   }
   return response.body;
 }
-const eventHandler$2 = defineEventHandler;
+const eventHandler$1 = defineEventHandler;
 function isEventHandler(input) {
   return hasProp(input, "__is_handler__");
 }
@@ -1475,7 +1765,7 @@ function defineLazyEventHandler(factory) {
     }
     return _promise;
   };
-  const handler = eventHandler$2((event) => {
+  const handler = eventHandler$1((event) => {
     if (_resolved) {
       return _resolved.handler(event);
     }
@@ -1527,7 +1817,7 @@ function use(app, arg1, arg2, arg3) {
 }
 function createAppEventHandler(stack, options) {
   const spacing = options.debug ? 2 : void 0;
-  return eventHandler$2(async (event) => {
+  return eventHandler$1(async (event) => {
     event.node.req.originalUrl = event.node.req.originalUrl || event.node.req.url || "/";
     const _reqPath = event._path || event.node.req.url || "/";
     let _layerPath;
@@ -1772,7 +2062,7 @@ function createRouter(opts = {}) {
     return { matched, handler };
   };
   const isPreemptive = opts.preemptive || opts.preemtive;
-  router.handler = eventHandler$2((event) => {
+  router.handler = eventHandler$1((event) => {
     const match = matchHandler(
       event.path,
       event.method.toLowerCase()
@@ -1825,7 +2115,7 @@ function toNodeListener(app) {
       if (!isError(_error)) {
         error.unhandled = true;
       }
-      setResponseStatus$1(event, error.statusCode, error.statusMessage);
+      setResponseStatus(event, error.statusCode, error.statusMessage);
       if (app.options.onError) {
         await app.options.onError(error, event);
       }
@@ -2103,7 +2393,7 @@ const payloadMethods = new Set(
 function isPayloadMethod(method = "GET") {
   return payloadMethods.has(method.toUpperCase());
 }
-function isJSONSerializable$1(value) {
+function isJSONSerializable(value) {
   if (value === void 0) {
     return false;
   }
@@ -2287,7 +2577,7 @@ function createFetch(globalOptions = {}) {
       }
     }
     if (context.options.body && isPayloadMethod(context.options.method)) {
-      if (isJSONSerializable$1(context.options.body)) {
+      if (isJSONSerializable(context.options.body)) {
         const contentType = context.options.headers.get("content-type");
         if (typeof context.options.body !== "string") {
           context.options.body = contentType === "application/x-www-form-urlencoded" ? new URLSearchParams(
@@ -2416,10 +2706,10 @@ function createNodeFetch() {
     return l$3(input, { ...nodeFetchOptions, ...init });
   };
 }
-const fetch$1 = globalThis.fetch ? (...args) => globalThis.fetch(...args) : createNodeFetch();
+const fetch = globalThis.fetch ? (...args) => globalThis.fetch(...args) : createNodeFetch();
 const Headers$1 = globalThis.Headers || s$2;
 const AbortController = globalThis.AbortController || i$3;
-createFetch({ fetch: fetch$1, Headers: Headers$1, AbortController });
+createFetch({ fetch, Headers: Headers$1, AbortController });
 
 function wrapToPromise(value) {
   if (!value || typeof value.then !== "function") {
@@ -3381,13 +3671,13 @@ const Hasher = /* @__PURE__ */ (() => {
   }
   return Hasher2;
 })();
-function serialize$1(object) {
+function serialize(object) {
   const hasher = new Hasher();
   hasher.dispatch(object);
   return hasher.buff;
 }
 function hash(value) {
-  return digest(typeof value === "string" ? value : serialize$1(value)).replace(/[-_]/g, "").slice(0, 10);
+  return digest(typeof value === "string" ? value : serialize(value)).replace(/[-_]/g, "").slice(0, 10);
 }
 
 function defaultCacheOptions() {
@@ -4063,7 +4353,7 @@ const _routeRulesMatcher = toRouteMatcher(
   createRouter$1({ routes: config.nitro.routeRules })
 );
 function createRouteRulesHandler(ctx) {
-  return eventHandler$2((event) => {
+  return eventHandler$1((event) => {
     const routeRules = getRouteRules(event);
     if (routeRules.headers) {
       setHeaders(event, routeRules.headers);
@@ -4081,7 +4371,7 @@ function createRouteRulesHandler(ctx) {
         const query = getQuery(event.path);
         target = withQuery(target, query);
       }
-      return sendRedirect$1(event, target, routeRules.redirect.statusCode);
+      return sendRedirect(event, target, routeRules.redirect.statusCode);
     }
     if (routeRules.proxy) {
       let target = routeRules.proxy.to;
@@ -4154,7 +4444,7 @@ const errorHandler$0 = defineNitroErrorHandler(
   function defaultNitroErrorHandler(error, event) {
     const res = defaultHandler(error, event);
     setResponseHeaders(event, res.headers);
-    setResponseStatus$1(event, res.status, res.statusText);
+    setResponseStatus(event, res.status, res.statusText);
     return send(event, JSON.stringify(res.body, null, 2));
   }
 );
@@ -4162,7 +4452,7 @@ function defaultHandler(error, event, opts) {
   const isSensitive = error.unhandled || error.fatal;
   const statusCode = error.statusCode || 500;
   const statusMessage = error.statusMessage || "Server Error";
-  const url = getRequestURL$1(event, { xForwardedHost: true, xForwardedProto: true });
+  const url = getRequestURL(event, { xForwardedHost: true, xForwardedProto: true });
   if (statusCode === 404) {
     const baseURL = "/";
     if (/^\/[^/]/.test(baseURL) && !url.pathname.startsWith(baseURL)) {
@@ -4191,8 +4481,8 @@ function defaultHandler(error, event, opts) {
     // Disable the execution of any js
     "content-security-policy": "script-src 'none'; frame-ancestors 'none';"
   };
-  setResponseStatus$1(event, statusCode, statusMessage);
-  if (statusCode === 404 || !getResponseHeader$1(event, "cache-control")) {
+  setResponseStatus(event, statusCode, statusMessage);
+  if (statusCode === 404 || !getResponseHeader(event, "cache-control")) {
     headers["cache-control"] = "no-cache";
   }
   const body = {
@@ -4229,7 +4519,7 @@ async function errorHandler(error, event) {
 }
 
 const appConfig = {"name":"vinxi","routers":[{"name":"public","type":"static","base":"/","dir":"./public","root":"/Users/dedirosandi/Documents/PROJECT/program-ela","order":0,"outDir":"/Users/dedirosandi/Documents/PROJECT/program-ela/.vinxi/build/public"},{"name":"ssr","type":"http","link":{"client":"client"},"handler":"src/entry-server.tsx","extensions":["js","jsx","ts","tsx"],"target":"server","root":"/Users/dedirosandi/Documents/PROJECT/program-ela","base":"/","outDir":"/Users/dedirosandi/Documents/PROJECT/program-ela/.vinxi/build/ssr","order":1},{"name":"client","type":"client","base":"/_build","handler":"src/entry-client.tsx","extensions":["js","jsx","ts","tsx"],"target":"browser","root":"/Users/dedirosandi/Documents/PROJECT/program-ela","outDir":"/Users/dedirosandi/Documents/PROJECT/program-ela/.vinxi/build/client","order":2},{"name":"server-fns","type":"http","base":"/_server","handler":"node_modules/@solidjs/start/dist/runtime/server-handler.js","target":"server","root":"/Users/dedirosandi/Documents/PROJECT/program-ela","outDir":"/Users/dedirosandi/Documents/PROJECT/program-ela/.vinxi/build/server-fns","order":3}],"server":{"compressPublicAssets":{"brotli":true},"routeRules":{"/_build/assets/**":{"headers":{"cache-control":"public, immutable, max-age=31536000"}}},"experimental":{"asyncContext":true},"preset":"vercel"},"root":"/Users/dedirosandi/Documents/PROJECT/program-ela"};
-					const buildManifest = {"ssr":{"_Button-BuAho1tZ.js":{"file":"assets/Button-BuAho1tZ.js","name":"Button"},"_HttpStatusCode-DH8IeaZe.js":{"file":"assets/HttpStatusCode-DH8IeaZe.js","name":"HttpStatusCode"},"_Loading-b-bAnbUN.js":{"file":"assets/Loading-b-bAnbUN.js","name":"Loading"},"_ProductForm-CMxez_KK.js":{"file":"assets/ProductForm-CMxez_KK.js","name":"ProductForm","imports":["_Button-BuAho1tZ.js"],"dynamicImports":["src/components/BarcodeScanner.tsx"]},"_UserForm-B0Y6JnWz.js":{"file":"assets/UserForm-B0Y6JnWz.js","name":"UserForm","imports":["_Button-BuAho1tZ.js"]},"_action-BnePvtfc.js":{"file":"assets/action-BnePvtfc.js","name":"action","imports":["_routing-BQM0aEOD.js"]},"_components-BfweKUze.js":{"file":"assets/components-BfweKUze.js","name":"components","imports":["_routing-BQM0aEOD.js"]},"_createAsync-CBz8AaaQ.js":{"file":"assets/createAsync-CBz8AaaQ.js","name":"createAsync"},"_fetchEvent-oIVSvjBj.js":{"file":"assets/fetchEvent-oIVSvjBj.js","name":"fetchEvent","isDynamicEntry":true},"_index-Dps0aSs2.js":{"file":"assets/index-Dps0aSs2.js","name":"index"},"_products-C9CQ8v25.js":{"file":"assets/products-C9CQ8v25.js","name":"products","imports":["_server-fns-runtime-DJML9_-T.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"_routing-BQM0aEOD.js":{"file":"assets/routing-BQM0aEOD.js","name":"routing"},"_schema-DxiP6MVG.js":{"file":"assets/schema-DxiP6MVG.js","name":"schema","isDynamicEntry":true},"_server-fns-runtime-DJML9_-T.js":{"file":"assets/server-fns-runtime-DJML9_-T.js","name":"server-fns-runtime","imports":["_fetchEvent-oIVSvjBj.js"]},"_users-DiCcX9od.js":{"file":"assets/users-DiCcX9od.js","name":"users","imports":["_server-fns-runtime-DJML9_-T.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/components/BarcodeScanner.tsx":{"file":"assets/BarcodeScanner-CiYZ4G5B.js","name":"BarcodeScanner","src":"src/components/BarcodeScanner.tsx","isDynamicEntry":true},"src/db/index.ts":{"file":"assets/index-BinUX9hy.js","name":"index","src":"src/db/index.ts","isDynamicEntry":true,"imports":["_schema-DxiP6MVG.js"]},"src/lib/session.ts":{"file":"assets/session-BHF4uoyM.js","name":"session","src":"src/lib/session.ts","isDynamicEntry":true,"imports":["_server-fns-runtime-DJML9_-T.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/routes/[...404].tsx?pick=default&pick=$css":{"file":"_...404_.js","name":"_...404_","src":"src/routes/[...404].tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_HttpStatusCode-DH8IeaZe.js"]},"src/routes/about.tsx?pick=default&pick=$css":{"file":"about.js","name":"about","src":"src/routes/about.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/auth/login.tsx?pick=default&pick=$css":{"file":"login.js","name":"login","src":"src/routes/auth/login.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_server-fns-runtime-DJML9_-T.js","_Loading-b-bAnbUN.js","_action-BnePvtfc.js","_fetchEvent-oIVSvjBj.js","_routing-BQM0aEOD.js"],"dynamicImports":["src/db/index.ts","_schema-DxiP6MVG.js","_fetchEvent-oIVSvjBj.js","src/lib/session.ts"]},"src/routes/dashboard.tsx?pick=default&pick=$css":{"file":"dashboard.js","name":"dashboard","src":"src/routes/dashboard.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_server-fns-runtime-DJML9_-T.js","src/lib/session.ts","_routing-BQM0aEOD.js","_components-BfweKUze.js","_Loading-b-bAnbUN.js","_createAsync-CBz8AaaQ.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css":{"file":"bad-stock.js","name":"bad-stock","src":"src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css":{"file":"barang-keluar.js","name":"barang-keluar","src":"src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css":{"file":"barang-masuk.js","name":"barang-masuk","src":"src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/dashboard/index.tsx?pick=default&pick=$css":{"file":"index.js","name":"index","src":"src/routes/dashboard/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_server-fns-runtime-DJML9_-T.js","_index-Dps0aSs2.js","_createAsync-CBz8AaaQ.js","_fetchEvent-oIVSvjBj.js"],"dynamicImports":["src/lib/session.ts"]},"src/routes/dashboard/main.tsx?pick=default&pick=$css":{"file":"main.js","name":"main","src":"src/routes/dashboard/main.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_components-BfweKUze.js","_routing-BQM0aEOD.js"]},"src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css":{"file":"edit.js","name":"edit","src":"src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_products-C9CQ8v25.js","_ProductForm-CMxez_KK.js","_Loading-b-bAnbUN.js","_routing-BQM0aEOD.js","_createAsync-CBz8AaaQ.js","_server-fns-runtime-DJML9_-T.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js","_Button-BuAho1tZ.js"]},"src/routes/dashboard/produk/create.tsx?pick=default&pick=$css":{"file":"create.js","name":"create","src":"src/routes/dashboard/produk/create.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_products-C9CQ8v25.js","_ProductForm-CMxez_KK.js","_routing-BQM0aEOD.js","_server-fns-runtime-DJML9_-T.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js","_Button-BuAho1tZ.js"]},"src/routes/dashboard/produk/index.tsx?pick=default&pick=$css":{"file":"index2.js","name":"index","src":"src/routes/dashboard/produk/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_products-C9CQ8v25.js","_components-BfweKUze.js","_createAsync-CBz8AaaQ.js","_server-fns-runtime-DJML9_-T.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js","_routing-BQM0aEOD.js"]},"src/routes/dashboard/settings.tsx?pick=default&pick=$css":{"file":"settings.js","name":"settings","src":"src/routes/dashboard/settings.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/dashboard/users/[id].tsx?pick=default&pick=$css":{"file":"_id_.js","name":"_id_","src":"src/routes/dashboard/users/[id].tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_users-DiCcX9od.js","_UserForm-B0Y6JnWz.js","_routing-BQM0aEOD.js","_createAsync-CBz8AaaQ.js","_server-fns-runtime-DJML9_-T.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js","_Button-BuAho1tZ.js"]},"src/routes/dashboard/users/create.tsx?pick=default&pick=$css":{"file":"create2.js","name":"create","src":"src/routes/dashboard/users/create.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_users-DiCcX9od.js","_UserForm-B0Y6JnWz.js","_routing-BQM0aEOD.js","_server-fns-runtime-DJML9_-T.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js","_Button-BuAho1tZ.js"]},"src/routes/dashboard/users/index.tsx?pick=default&pick=$css":{"file":"index3.js","name":"index","src":"src/routes/dashboard/users/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_users-DiCcX9od.js","_createAsync-CBz8AaaQ.js","_components-BfweKUze.js","_server-fns-runtime-DJML9_-T.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js","_routing-BQM0aEOD.js"]},"src/routes/index.tsx?pick=default&pick=$css":{"file":"index4.js","name":"index","src":"src/routes/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_server-fns-runtime-DJML9_-T.js","src/lib/session.ts","_createAsync-CBz8AaaQ.js","_components-BfweKUze.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js","_routing-BQM0aEOD.js"]},"virtual:$vinxi/handler/ssr":{"file":"ssr.js","name":"ssr","src":"virtual:$vinxi/handler/ssr","isEntry":true,"imports":["_fetchEvent-oIVSvjBj.js","_index-Dps0aSs2.js","_Loading-b-bAnbUN.js","_routing-BQM0aEOD.js","_action-BnePvtfc.js","_HttpStatusCode-DH8IeaZe.js"],"dynamicImports":["src/routes/[...404].tsx?pick=default&pick=$css","src/routes/[...404].tsx?pick=default&pick=$css","src/routes/about.tsx?pick=default&pick=$css","src/routes/about.tsx?pick=default&pick=$css","src/routes/auth/login.tsx?pick=default&pick=$css","src/routes/auth/login.tsx?pick=default&pick=$css","src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css","src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css","src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css","src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css","src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css","src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css","src/routes/dashboard/index.tsx?pick=default&pick=$css","src/routes/dashboard/index.tsx?pick=default&pick=$css","src/routes/dashboard/main.tsx?pick=default&pick=$css","src/routes/dashboard/main.tsx?pick=default&pick=$css","src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css","src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css","src/routes/dashboard/produk/create.tsx?pick=default&pick=$css","src/routes/dashboard/produk/create.tsx?pick=default&pick=$css","src/routes/dashboard/produk/index.tsx?pick=default&pick=$css","src/routes/dashboard/produk/index.tsx?pick=default&pick=$css","src/routes/dashboard/settings.tsx?pick=default&pick=$css","src/routes/dashboard/settings.tsx?pick=default&pick=$css","src/routes/dashboard/users/[id].tsx?pick=default&pick=$css","src/routes/dashboard/users/[id].tsx?pick=default&pick=$css","src/routes/dashboard/users/create.tsx?pick=default&pick=$css","src/routes/dashboard/users/create.tsx?pick=default&pick=$css","src/routes/dashboard/users/index.tsx?pick=default&pick=$css","src/routes/dashboard/users/index.tsx?pick=default&pick=$css","src/routes/dashboard.tsx?pick=default&pick=$css","src/routes/dashboard.tsx?pick=default&pick=$css","src/routes/index.tsx?pick=default&pick=$css","src/routes/index.tsx?pick=default&pick=$css"],"css":["assets/ssr-WNa2LR0V.css"]}},"client":{"_Button-lI7l4pQ1.js":{"file":"assets/Button-lI7l4pQ1.js","name":"Button","imports":["_web-B77D8VL7.js"]},"_HttpStatusCode-DjTx85av.js":{"file":"assets/HttpStatusCode-DjTx85av.js","name":"HttpStatusCode"},"_Loading-dYFU-h2h.js":{"file":"assets/Loading-dYFU-h2h.js","name":"Loading","imports":["_web-B77D8VL7.js"]},"_ProductForm-DsQCavUB.js":{"file":"assets/ProductForm-DsQCavUB.js","name":"ProductForm","imports":["_preload-helper-ug3pwPZ1.js","_web-B77D8VL7.js","_Button-lI7l4pQ1.js"],"dynamicImports":["src/components/BarcodeScanner.tsx"]},"_UserForm-ri37YpI2.js":{"file":"assets/UserForm-ri37YpI2.js","name":"UserForm","imports":["_web-B77D8VL7.js","_Button-lI7l4pQ1.js"]},"_action-tENG7AIF.js":{"file":"assets/action-tENG7AIF.js","name":"action","imports":["_web-B77D8VL7.js","_routing-D8yMn4L8.js"]},"_components-lAEjSgtd.js":{"file":"assets/components-lAEjSgtd.js","name":"components","imports":["_web-B77D8VL7.js","_routing-D8yMn4L8.js"]},"_createAsync-DwDWr0TH.js":{"file":"assets/createAsync-DwDWr0TH.js","name":"createAsync","imports":["_web-B77D8VL7.js"]},"_index-D0gPe-Qg.js":{"file":"assets/index-D0gPe-Qg.js","name":"index","imports":["_web-B77D8VL7.js"]},"_preload-helper-ug3pwPZ1.js":{"file":"assets/preload-helper-ug3pwPZ1.js","name":"preload-helper"},"_products-Bt1scIOC.js":{"file":"assets/products-Bt1scIOC.js","name":"products","imports":["_server-runtime-C6utdK21.js"]},"_routing-D8yMn4L8.js":{"file":"assets/routing-D8yMn4L8.js","name":"routing","imports":["_web-B77D8VL7.js"]},"_server-runtime-C6utdK21.js":{"file":"assets/server-runtime-C6utdK21.js","name":"server-runtime"},"_users-C72Eb6nw.js":{"file":"assets/users-C72Eb6nw.js","name":"users","imports":["_server-runtime-C6utdK21.js"]},"_web-B77D8VL7.js":{"file":"assets/web-B77D8VL7.js","name":"web"},"src/components/BarcodeScanner.tsx":{"file":"assets/BarcodeScanner-CcNMGE-w.js","name":"BarcodeScanner","src":"src/components/BarcodeScanner.tsx","isDynamicEntry":true,"imports":["_web-B77D8VL7.js"]},"src/routes/[...404].tsx?pick=default&pick=$css":{"file":"assets/_...404_-DEHdqO7T.js","name":"_...404_","src":"src/routes/[...404].tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js","_HttpStatusCode-DjTx85av.js"]},"src/routes/about.tsx?pick=default&pick=$css":{"file":"assets/about-CPibYA7I.js","name":"about","src":"src/routes/about.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js"]},"src/routes/auth/login.tsx?pick=default&pick=$css":{"file":"assets/login-Dc6ZwhAi.js","name":"login","src":"src/routes/auth/login.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_server-runtime-C6utdK21.js","_Loading-dYFU-h2h.js","_action-tENG7AIF.js","_routing-D8yMn4L8.js"]},"src/routes/dashboard.tsx?pick=default&pick=$css":{"file":"assets/dashboard-CMq5HOHt.js","name":"dashboard","src":"src/routes/dashboard.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_server-runtime-C6utdK21.js","_routing-D8yMn4L8.js","_components-lAEjSgtd.js","_Loading-dYFU-h2h.js","_createAsync-DwDWr0TH.js"]},"src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css":{"file":"assets/bad-stock-C7kYTAH-.js","name":"bad-stock","src":"src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js"]},"src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css":{"file":"assets/barang-keluar-DYmJwA3q.js","name":"barang-keluar","src":"src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js"]},"src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css":{"file":"assets/barang-masuk-BRyqJpYU.js","name":"barang-masuk","src":"src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js"]},"src/routes/dashboard/index.tsx?pick=default&pick=$css":{"file":"assets/index-D90WEW3r.js","name":"index","src":"src/routes/dashboard/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_server-runtime-C6utdK21.js","_index-D0gPe-Qg.js","_createAsync-DwDWr0TH.js"]},"src/routes/dashboard/main.tsx?pick=default&pick=$css":{"file":"assets/main-bWtj_JCV.js","name":"main","src":"src/routes/dashboard/main.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_components-lAEjSgtd.js","_routing-D8yMn4L8.js"]},"src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css":{"file":"assets/edit-Be4KZO-Q.js","name":"edit","src":"src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js","_products-Bt1scIOC.js","_ProductForm-DsQCavUB.js","_Loading-dYFU-h2h.js","_routing-D8yMn4L8.js","_createAsync-DwDWr0TH.js","_server-runtime-C6utdK21.js","_preload-helper-ug3pwPZ1.js","_Button-lI7l4pQ1.js"]},"src/routes/dashboard/produk/create.tsx?pick=default&pick=$css":{"file":"assets/create-DLMF0B8x.js","name":"create","src":"src/routes/dashboard/produk/create.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js","_products-Bt1scIOC.js","_ProductForm-DsQCavUB.js","_routing-D8yMn4L8.js","_server-runtime-C6utdK21.js","_preload-helper-ug3pwPZ1.js","_Button-lI7l4pQ1.js"]},"src/routes/dashboard/produk/index.tsx?pick=default&pick=$css":{"file":"assets/index-BwmaBC60.js","name":"index","src":"src/routes/dashboard/produk/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js","_products-Bt1scIOC.js","_components-lAEjSgtd.js","_createAsync-DwDWr0TH.js","_server-runtime-C6utdK21.js","_routing-D8yMn4L8.js"]},"src/routes/dashboard/settings.tsx?pick=default&pick=$css":{"file":"assets/settings-BCP4ZAFe.js","name":"settings","src":"src/routes/dashboard/settings.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js"]},"src/routes/dashboard/users/[id].tsx?pick=default&pick=$css":{"file":"assets/_id_-l9tvnHXo.js","name":"_id_","src":"src/routes/dashboard/users/[id].tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js","_users-C72Eb6nw.js","_UserForm-ri37YpI2.js","_routing-D8yMn4L8.js","_createAsync-DwDWr0TH.js","_server-runtime-C6utdK21.js","_Button-lI7l4pQ1.js"]},"src/routes/dashboard/users/create.tsx?pick=default&pick=$css":{"file":"assets/create-tqVW4jW7.js","name":"create","src":"src/routes/dashboard/users/create.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js","_users-C72Eb6nw.js","_UserForm-ri37YpI2.js","_routing-D8yMn4L8.js","_server-runtime-C6utdK21.js","_Button-lI7l4pQ1.js"]},"src/routes/dashboard/users/index.tsx?pick=default&pick=$css":{"file":"assets/index-CWzKkoAN.js","name":"index","src":"src/routes/dashboard/users/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js","_users-C72Eb6nw.js","_createAsync-DwDWr0TH.js","_components-lAEjSgtd.js","_server-runtime-C6utdK21.js","_routing-D8yMn4L8.js"]},"src/routes/index.tsx?pick=default&pick=$css":{"file":"assets/index-Crk1m6o4.js","name":"index","src":"src/routes/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_server-runtime-C6utdK21.js","_createAsync-DwDWr0TH.js","_components-lAEjSgtd.js","_routing-D8yMn4L8.js"]},"virtual:$vinxi/handler/client":{"file":"assets/client-DeqmpdKB.js","name":"client","src":"virtual:$vinxi/handler/client","isEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js","_preload-helper-ug3pwPZ1.js","_Loading-dYFU-h2h.js","_routing-D8yMn4L8.js","_action-tENG7AIF.js","_HttpStatusCode-DjTx85av.js"],"dynamicImports":["src/routes/[...404].tsx?pick=default&pick=$css","src/routes/about.tsx?pick=default&pick=$css","src/routes/auth/login.tsx?pick=default&pick=$css","src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css","src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css","src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css","src/routes/dashboard/index.tsx?pick=default&pick=$css","src/routes/dashboard/main.tsx?pick=default&pick=$css","src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css","src/routes/dashboard/produk/create.tsx?pick=default&pick=$css","src/routes/dashboard/produk/index.tsx?pick=default&pick=$css","src/routes/dashboard/settings.tsx?pick=default&pick=$css","src/routes/dashboard/users/[id].tsx?pick=default&pick=$css","src/routes/dashboard/users/create.tsx?pick=default&pick=$css","src/routes/dashboard/users/index.tsx?pick=default&pick=$css","src/routes/dashboard.tsx?pick=default&pick=$css","src/routes/index.tsx?pick=default&pick=$css"],"css":["assets/client-WNa2LR0V.css"]}},"server-fns":{"_Button-BuAho1tZ.js":{"file":"assets/Button-BuAho1tZ.js","name":"Button"},"_Loading-b-bAnbUN.js":{"file":"assets/Loading-b-bAnbUN.js","name":"Loading"},"_ProductForm-CMxez_KK.js":{"file":"assets/ProductForm-CMxez_KK.js","name":"ProductForm","imports":["_Button-BuAho1tZ.js"],"dynamicImports":["src/components/BarcodeScanner.tsx"]},"_UserForm-B0Y6JnWz.js":{"file":"assets/UserForm-B0Y6JnWz.js","name":"UserForm","imports":["_Button-BuAho1tZ.js"]},"_action-CnXm9LBs.js":{"file":"assets/action-CnXm9LBs.js","name":"action","imports":["_routing-CMRlbYJP.js"]},"_components-2Zj0uUoj.js":{"file":"assets/components-2Zj0uUoj.js","name":"components","imports":["_routing-CMRlbYJP.js"]},"_createAsync-CBz8AaaQ.js":{"file":"assets/createAsync-CBz8AaaQ.js","name":"createAsync"},"_fetchEvent-CIpVWTXg.js":{"file":"assets/fetchEvent-CIpVWTXg.js","name":"fetchEvent","isDynamicEntry":true},"_index-Dps0aSs2.js":{"file":"assets/index-Dps0aSs2.js","name":"index"},"_products-BWm0EwFZ.js":{"file":"assets/products-BWm0EwFZ.js","name":"products","imports":["_server-fns-runtime-HUGH5Jm0.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"_routing-CMRlbYJP.js":{"file":"assets/routing-CMRlbYJP.js","name":"routing"},"_schema-DxiP6MVG.js":{"file":"assets/schema-DxiP6MVG.js","name":"schema","isDynamicEntry":true},"_server-fns-DSWMe6uF.js":{"file":"assets/server-fns-DSWMe6uF.js","name":"server-fns","imports":["_fetchEvent-CIpVWTXg.js"],"dynamicImports":["src/routes/[...404].tsx?pick=default&pick=$css","src/routes/[...404].tsx?pick=default&pick=$css","src/routes/about.tsx?pick=default&pick=$css","src/routes/about.tsx?pick=default&pick=$css","src/routes/auth/login.tsx?pick=default&pick=$css","src/routes/auth/login.tsx?pick=default&pick=$css","src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css","src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css","src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css","src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css","src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css","src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css","src/routes/dashboard/index.tsx?pick=default&pick=$css","src/routes/dashboard/index.tsx?pick=default&pick=$css","src/routes/dashboard/main.tsx?pick=default&pick=$css","src/routes/dashboard/main.tsx?pick=default&pick=$css","src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css","src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css","src/routes/dashboard/produk/create.tsx?pick=default&pick=$css","src/routes/dashboard/produk/create.tsx?pick=default&pick=$css","src/routes/dashboard/produk/index.tsx?pick=default&pick=$css","src/routes/dashboard/produk/index.tsx?pick=default&pick=$css","src/routes/dashboard/settings.tsx?pick=default&pick=$css","src/routes/dashboard/settings.tsx?pick=default&pick=$css","src/routes/dashboard/users/[id].tsx?pick=default&pick=$css","src/routes/dashboard/users/[id].tsx?pick=default&pick=$css","src/routes/dashboard/users/create.tsx?pick=default&pick=$css","src/routes/dashboard/users/create.tsx?pick=default&pick=$css","src/routes/dashboard/users/index.tsx?pick=default&pick=$css","src/routes/dashboard/users/index.tsx?pick=default&pick=$css","src/routes/dashboard.tsx?pick=default&pick=$css","src/routes/dashboard.tsx?pick=default&pick=$css","src/routes/index.tsx?pick=default&pick=$css","src/routes/index.tsx?pick=default&pick=$css","src/routes/dashboard/index.tsx?pick=default&pick=%24css&tsr-directive-use-server=","src/routes/dashboard.tsx?pick=default&pick=%24css&tsr-directive-use-server=","src/routes/auth/login.tsx?pick=default&pick=%24css&tsr-directive-use-server=","src/lib/auth-checks.ts?tsr-directive-use-server=","src/lib/products.ts?tsr-directive-use-server=","src/lib/products.ts?tsr-directive-use-server=","src/lib/products.ts?tsr-directive-use-server=","src/lib/products.ts?tsr-directive-use-server=","src/lib/products.ts?tsr-directive-use-server=","src/lib/users.ts?tsr-directive-use-server=","src/lib/users.ts?tsr-directive-use-server=","src/lib/users.ts?tsr-directive-use-server=","src/lib/users.ts?tsr-directive-use-server=","src/lib/users.ts?tsr-directive-use-server=","src/lib/session.ts?tsr-directive-use-server=","src/lib/session.ts?tsr-directive-use-server=","src/lib/session.ts?tsr-directive-use-server=","src/app.tsx"]},"_server-fns-runtime-HUGH5Jm0.js":{"file":"assets/server-fns-runtime-HUGH5Jm0.js","name":"server-fns-runtime","imports":["_fetchEvent-CIpVWTXg.js"]},"_users-BYnp0MmX.js":{"file":"assets/users-BYnp0MmX.js","name":"users","imports":["_server-fns-runtime-HUGH5Jm0.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/app.tsx":{"file":"assets/app-DdXtN6Nq.js","name":"app","src":"src/app.tsx","isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_server-fns-DSWMe6uF.js","_Loading-b-bAnbUN.js","_routing-CMRlbYJP.js","_action-CnXm9LBs.js","_fetchEvent-CIpVWTXg.js"],"css":["assets/app-WNa2LR0V.css"]},"src/components/BarcodeScanner.tsx":{"file":"assets/BarcodeScanner-CiYZ4G5B.js","name":"BarcodeScanner","src":"src/components/BarcodeScanner.tsx","isDynamicEntry":true},"src/db/index.ts":{"file":"assets/index-BinUX9hy.js","name":"index","src":"src/db/index.ts","isDynamicEntry":true,"imports":["_schema-DxiP6MVG.js"]},"src/lib/auth-checks.ts?tsr-directive-use-server=":{"file":"assets/auth-checks-BwLvXVBd.js","name":"auth-checks","src":"src/lib/auth-checks.ts?tsr-directive-use-server=","isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","src/lib/session.ts","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/lib/products.ts?tsr-directive-use-server=":{"file":"assets/products-QOPIUUBV.js","name":"products","src":"src/lib/products.ts?tsr-directive-use-server=","isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","src/db/index.ts","_schema-DxiP6MVG.js","_fetchEvent-CIpVWTXg.js"]},"src/lib/session.ts":{"file":"assets/session-D_Gl5yQj.js","name":"session","src":"src/lib/session.ts","isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/lib/session.ts?tsr-directive-use-server=":{"file":"assets/session-C4pX75Tv.js","name":"session","src":"src/lib/session.ts?tsr-directive-use-server=","isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/lib/users.ts?tsr-directive-use-server=":{"file":"assets/users-DUDoXUFs.js","name":"users","src":"src/lib/users.ts?tsr-directive-use-server=","isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","src/db/index.ts","_schema-DxiP6MVG.js","_fetchEvent-CIpVWTXg.js"]},"src/routes/[...404].tsx?pick=default&pick=$css":{"file":"_...404_.js","name":"_...404_","src":"src/routes/[...404].tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/about.tsx?pick=default&pick=$css":{"file":"about.js","name":"about","src":"src/routes/about.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/auth/login.tsx?pick=default&pick=$css":{"file":"login.js","name":"login","src":"src/routes/auth/login.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","_Loading-b-bAnbUN.js","_action-CnXm9LBs.js","_fetchEvent-CIpVWTXg.js","_routing-CMRlbYJP.js"],"dynamicImports":["src/db/index.ts","_schema-DxiP6MVG.js","_fetchEvent-CIpVWTXg.js","src/lib/session.ts"]},"src/routes/auth/login.tsx?pick=default&pick=%24css&tsr-directive-use-server=":{"file":"assets/login-CGNBHsLW.js","name":"login","src":"src/routes/auth/login.tsx?pick=default&pick=%24css&tsr-directive-use-server=","isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js"],"dynamicImports":["src/db/index.ts","_schema-DxiP6MVG.js","_fetchEvent-CIpVWTXg.js","src/lib/session.ts"]},"src/routes/dashboard.tsx?pick=default&pick=$css":{"file":"dashboard.js","name":"dashboard","src":"src/routes/dashboard.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","src/lib/session.ts","_routing-CMRlbYJP.js","_components-2Zj0uUoj.js","_Loading-b-bAnbUN.js","_createAsync-CBz8AaaQ.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/routes/dashboard.tsx?pick=default&pick=%24css&tsr-directive-use-server=":{"file":"assets/dashboard-D5mZp-20.js","name":"dashboard","src":"src/routes/dashboard.tsx?pick=default&pick=%24css&tsr-directive-use-server=","isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","src/lib/session.ts","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css":{"file":"bad-stock.js","name":"bad-stock","src":"src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css":{"file":"barang-keluar.js","name":"barang-keluar","src":"src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css":{"file":"barang-masuk.js","name":"barang-masuk","src":"src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/dashboard/index.tsx?pick=default&pick=$css":{"file":"index.js","name":"index","src":"src/routes/dashboard/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","_index-Dps0aSs2.js","_createAsync-CBz8AaaQ.js","_fetchEvent-CIpVWTXg.js"],"dynamicImports":["src/lib/session.ts"]},"src/routes/dashboard/index.tsx?pick=default&pick=%24css&tsr-directive-use-server=":{"file":"assets/index-D39yfOTr.js","name":"index","src":"src/routes/dashboard/index.tsx?pick=default&pick=%24css&tsr-directive-use-server=","isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js"],"dynamicImports":["src/lib/session.ts"]},"src/routes/dashboard/main.tsx?pick=default&pick=$css":{"file":"main.js","name":"main","src":"src/routes/dashboard/main.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_components-2Zj0uUoj.js","_routing-CMRlbYJP.js"]},"src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css":{"file":"edit.js","name":"edit","src":"src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_products-BWm0EwFZ.js","_ProductForm-CMxez_KK.js","_Loading-b-bAnbUN.js","_routing-CMRlbYJP.js","_createAsync-CBz8AaaQ.js","_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js","_Button-BuAho1tZ.js"]},"src/routes/dashboard/produk/create.tsx?pick=default&pick=$css":{"file":"create.js","name":"create","src":"src/routes/dashboard/produk/create.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_products-BWm0EwFZ.js","_ProductForm-CMxez_KK.js","_routing-CMRlbYJP.js","_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js","_Button-BuAho1tZ.js"]},"src/routes/dashboard/produk/index.tsx?pick=default&pick=$css":{"file":"index2.js","name":"index","src":"src/routes/dashboard/produk/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_products-BWm0EwFZ.js","_components-2Zj0uUoj.js","_createAsync-CBz8AaaQ.js","_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js","_routing-CMRlbYJP.js"]},"src/routes/dashboard/settings.tsx?pick=default&pick=$css":{"file":"settings.js","name":"settings","src":"src/routes/dashboard/settings.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/dashboard/users/[id].tsx?pick=default&pick=$css":{"file":"_id_.js","name":"_id_","src":"src/routes/dashboard/users/[id].tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_users-BYnp0MmX.js","_UserForm-B0Y6JnWz.js","_routing-CMRlbYJP.js","_createAsync-CBz8AaaQ.js","_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js","_Button-BuAho1tZ.js"]},"src/routes/dashboard/users/create.tsx?pick=default&pick=$css":{"file":"create2.js","name":"create","src":"src/routes/dashboard/users/create.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_users-BYnp0MmX.js","_UserForm-B0Y6JnWz.js","_routing-CMRlbYJP.js","_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js","_Button-BuAho1tZ.js"]},"src/routes/dashboard/users/index.tsx?pick=default&pick=$css":{"file":"index3.js","name":"index","src":"src/routes/dashboard/users/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_users-BYnp0MmX.js","_createAsync-CBz8AaaQ.js","_components-2Zj0uUoj.js","_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js","_routing-CMRlbYJP.js"]},"src/routes/index.tsx?pick=default&pick=$css":{"file":"index4.js","name":"index","src":"src/routes/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","src/lib/session.ts","_createAsync-CBz8AaaQ.js","_components-2Zj0uUoj.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js","_routing-CMRlbYJP.js"]},"virtual:$vinxi/handler/server-fns":{"file":"server-fns.js","name":"server-fns","src":"virtual:$vinxi/handler/server-fns","isEntry":true,"imports":["_server-fns-DSWMe6uF.js","_fetchEvent-CIpVWTXg.js"]}}};
+					const buildManifest = {"ssr":{"_Button-BuAho1tZ.js":{"file":"assets/Button-BuAho1tZ.js","name":"Button"},"_HttpStatusCode-DH8IeaZe.js":{"file":"assets/HttpStatusCode-DH8IeaZe.js","name":"HttpStatusCode"},"_Loading-b-bAnbUN.js":{"file":"assets/Loading-b-bAnbUN.js","name":"Loading"},"_ProductForm-CMxez_KK.js":{"file":"assets/ProductForm-CMxez_KK.js","name":"ProductForm","imports":["_Button-BuAho1tZ.js"],"dynamicImports":["src/components/BarcodeScanner.tsx"]},"_UserForm-B0Y6JnWz.js":{"file":"assets/UserForm-B0Y6JnWz.js","name":"UserForm","imports":["_Button-BuAho1tZ.js"]},"_action-BnePvtfc.js":{"file":"assets/action-BnePvtfc.js","name":"action","imports":["_routing-BQM0aEOD.js"]},"_components-BfweKUze.js":{"file":"assets/components-BfweKUze.js","name":"components","imports":["_routing-BQM0aEOD.js"]},"_createAsync-CBz8AaaQ.js":{"file":"assets/createAsync-CBz8AaaQ.js","name":"createAsync"},"_fetchEvent-oIVSvjBj.js":{"file":"assets/fetchEvent-oIVSvjBj.js","name":"fetchEvent","isDynamicEntry":true},"_index-Dps0aSs2.js":{"file":"assets/index-Dps0aSs2.js","name":"index"},"_products-C9CQ8v25.js":{"file":"assets/products-C9CQ8v25.js","name":"products","imports":["_server-fns-runtime-DJML9_-T.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"_routing-BQM0aEOD.js":{"file":"assets/routing-BQM0aEOD.js","name":"routing"},"_schema-DxiP6MVG.js":{"file":"assets/schema-DxiP6MVG.js","name":"schema","isDynamicEntry":true},"_server-fns-runtime-DJML9_-T.js":{"file":"assets/server-fns-runtime-DJML9_-T.js","name":"server-fns-runtime","imports":["_fetchEvent-oIVSvjBj.js"]},"_users-DiCcX9od.js":{"file":"assets/users-DiCcX9od.js","name":"users","imports":["_server-fns-runtime-DJML9_-T.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/components/BarcodeScanner.tsx":{"file":"assets/BarcodeScanner-CiYZ4G5B.js","name":"BarcodeScanner","src":"src/components/BarcodeScanner.tsx","isDynamicEntry":true},"src/db/index.ts":{"file":"assets/index-BinUX9hy.js","name":"index","src":"src/db/index.ts","isDynamicEntry":true,"imports":["_schema-DxiP6MVG.js"]},"src/lib/session.ts":{"file":"assets/session-BHF4uoyM.js","name":"session","src":"src/lib/session.ts","isDynamicEntry":true,"imports":["_server-fns-runtime-DJML9_-T.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/routes/[...404].tsx?pick=default&pick=$css":{"file":"_...404_.js","name":"_...404_","src":"src/routes/[...404].tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_HttpStatusCode-DH8IeaZe.js"]},"src/routes/about.tsx?pick=default&pick=$css":{"file":"about.js","name":"about","src":"src/routes/about.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/auth/login.tsx?pick=default&pick=$css":{"file":"login.js","name":"login","src":"src/routes/auth/login.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_server-fns-runtime-DJML9_-T.js","_Loading-b-bAnbUN.js","_action-BnePvtfc.js","_fetchEvent-oIVSvjBj.js","_routing-BQM0aEOD.js"],"dynamicImports":["src/db/index.ts","_schema-DxiP6MVG.js","_fetchEvent-oIVSvjBj.js","src/lib/session.ts"]},"src/routes/dashboard.tsx?pick=default&pick=$css":{"file":"dashboard.js","name":"dashboard","src":"src/routes/dashboard.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_server-fns-runtime-DJML9_-T.js","src/lib/session.ts","_routing-BQM0aEOD.js","_components-BfweKUze.js","_Loading-b-bAnbUN.js","_createAsync-CBz8AaaQ.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css":{"file":"bad-stock.js","name":"bad-stock","src":"src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css":{"file":"barang-keluar.js","name":"barang-keluar","src":"src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css":{"file":"barang-masuk.js","name":"barang-masuk","src":"src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/dashboard/index.tsx?pick=default&pick=$css":{"file":"index.js","name":"index","src":"src/routes/dashboard/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_server-fns-runtime-DJML9_-T.js","_index-Dps0aSs2.js","_createAsync-CBz8AaaQ.js","_fetchEvent-oIVSvjBj.js"],"dynamicImports":["src/lib/session.ts"]},"src/routes/dashboard/main.tsx?pick=default&pick=$css":{"file":"main.js","name":"main","src":"src/routes/dashboard/main.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_components-BfweKUze.js","_routing-BQM0aEOD.js"]},"src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css":{"file":"edit.js","name":"edit","src":"src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_products-C9CQ8v25.js","_ProductForm-CMxez_KK.js","_Loading-b-bAnbUN.js","_routing-BQM0aEOD.js","_createAsync-CBz8AaaQ.js","_server-fns-runtime-DJML9_-T.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js","_Button-BuAho1tZ.js"]},"src/routes/dashboard/produk/create.tsx?pick=default&pick=$css":{"file":"create.js","name":"create","src":"src/routes/dashboard/produk/create.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_products-C9CQ8v25.js","_ProductForm-CMxez_KK.js","_routing-BQM0aEOD.js","_server-fns-runtime-DJML9_-T.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js","_Button-BuAho1tZ.js"]},"src/routes/dashboard/produk/index.tsx?pick=default&pick=$css":{"file":"index2.js","name":"index","src":"src/routes/dashboard/produk/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_products-C9CQ8v25.js","_components-BfweKUze.js","_createAsync-CBz8AaaQ.js","_server-fns-runtime-DJML9_-T.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js","_routing-BQM0aEOD.js"]},"src/routes/dashboard/settings.tsx?pick=default&pick=$css":{"file":"settings.js","name":"settings","src":"src/routes/dashboard/settings.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/dashboard/users/[id].tsx?pick=default&pick=$css":{"file":"_id_.js","name":"_id_","src":"src/routes/dashboard/users/[id].tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_users-DiCcX9od.js","_UserForm-B0Y6JnWz.js","_routing-BQM0aEOD.js","_createAsync-CBz8AaaQ.js","_server-fns-runtime-DJML9_-T.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js","_Button-BuAho1tZ.js"]},"src/routes/dashboard/users/create.tsx?pick=default&pick=$css":{"file":"create2.js","name":"create","src":"src/routes/dashboard/users/create.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_users-DiCcX9od.js","_UserForm-B0Y6JnWz.js","_routing-BQM0aEOD.js","_server-fns-runtime-DJML9_-T.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js","_Button-BuAho1tZ.js"]},"src/routes/dashboard/users/index.tsx?pick=default&pick=$css":{"file":"index3.js","name":"index","src":"src/routes/dashboard/users/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_users-DiCcX9od.js","_createAsync-CBz8AaaQ.js","_components-BfweKUze.js","_server-fns-runtime-DJML9_-T.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js","_routing-BQM0aEOD.js"]},"src/routes/index.tsx?pick=default&pick=$css":{"file":"index4.js","name":"index","src":"src/routes/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_server-fns-runtime-DJML9_-T.js","src/lib/session.ts","_createAsync-CBz8AaaQ.js","_components-BfweKUze.js","_fetchEvent-oIVSvjBj.js","src/db/index.ts","_schema-DxiP6MVG.js","_routing-BQM0aEOD.js"]},"virtual:$vinxi/handler/ssr":{"file":"ssr.js","name":"ssr","src":"virtual:$vinxi/handler/ssr","isEntry":true,"imports":["_fetchEvent-oIVSvjBj.js","_index-Dps0aSs2.js","_Loading-b-bAnbUN.js","_routing-BQM0aEOD.js","_action-BnePvtfc.js","_HttpStatusCode-DH8IeaZe.js"],"dynamicImports":["src/routes/[...404].tsx?pick=default&pick=$css","src/routes/[...404].tsx?pick=default&pick=$css","src/routes/about.tsx?pick=default&pick=$css","src/routes/about.tsx?pick=default&pick=$css","src/routes/auth/login.tsx?pick=default&pick=$css","src/routes/auth/login.tsx?pick=default&pick=$css","src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css","src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css","src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css","src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css","src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css","src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css","src/routes/dashboard/index.tsx?pick=default&pick=$css","src/routes/dashboard/index.tsx?pick=default&pick=$css","src/routes/dashboard/main.tsx?pick=default&pick=$css","src/routes/dashboard/main.tsx?pick=default&pick=$css","src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css","src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css","src/routes/dashboard/produk/create.tsx?pick=default&pick=$css","src/routes/dashboard/produk/create.tsx?pick=default&pick=$css","src/routes/dashboard/produk/index.tsx?pick=default&pick=$css","src/routes/dashboard/produk/index.tsx?pick=default&pick=$css","src/routes/dashboard/settings.tsx?pick=default&pick=$css","src/routes/dashboard/settings.tsx?pick=default&pick=$css","src/routes/dashboard/users/[id].tsx?pick=default&pick=$css","src/routes/dashboard/users/[id].tsx?pick=default&pick=$css","src/routes/dashboard/users/create.tsx?pick=default&pick=$css","src/routes/dashboard/users/create.tsx?pick=default&pick=$css","src/routes/dashboard/users/index.tsx?pick=default&pick=$css","src/routes/dashboard/users/index.tsx?pick=default&pick=$css","src/routes/dashboard.tsx?pick=default&pick=$css","src/routes/dashboard.tsx?pick=default&pick=$css","src/routes/index.tsx?pick=default&pick=$css","src/routes/index.tsx?pick=default&pick=$css"],"css":["assets/ssr-WNa2LR0V.css"]}},"client":{"_Button-lI7l4pQ1.js":{"file":"assets/Button-lI7l4pQ1.js","name":"Button","imports":["_web-B77D8VL7.js"]},"_HttpStatusCode-DjTx85av.js":{"file":"assets/HttpStatusCode-DjTx85av.js","name":"HttpStatusCode"},"_Loading-dYFU-h2h.js":{"file":"assets/Loading-dYFU-h2h.js","name":"Loading","imports":["_web-B77D8VL7.js"]},"_ProductForm-DsQCavUB.js":{"file":"assets/ProductForm-DsQCavUB.js","name":"ProductForm","imports":["_preload-helper-ug3pwPZ1.js","_web-B77D8VL7.js","_Button-lI7l4pQ1.js"],"dynamicImports":["src/components/BarcodeScanner.tsx"]},"_UserForm-ri37YpI2.js":{"file":"assets/UserForm-ri37YpI2.js","name":"UserForm","imports":["_web-B77D8VL7.js","_Button-lI7l4pQ1.js"]},"_action-tENG7AIF.js":{"file":"assets/action-tENG7AIF.js","name":"action","imports":["_web-B77D8VL7.js","_routing-D8yMn4L8.js"]},"_components-lAEjSgtd.js":{"file":"assets/components-lAEjSgtd.js","name":"components","imports":["_web-B77D8VL7.js","_routing-D8yMn4L8.js"]},"_createAsync-DwDWr0TH.js":{"file":"assets/createAsync-DwDWr0TH.js","name":"createAsync","imports":["_web-B77D8VL7.js"]},"_index-D0gPe-Qg.js":{"file":"assets/index-D0gPe-Qg.js","name":"index","imports":["_web-B77D8VL7.js"]},"_preload-helper-ug3pwPZ1.js":{"file":"assets/preload-helper-ug3pwPZ1.js","name":"preload-helper"},"_products-Bt1scIOC.js":{"file":"assets/products-Bt1scIOC.js","name":"products","imports":["_server-runtime-C6utdK21.js"]},"_routing-D8yMn4L8.js":{"file":"assets/routing-D8yMn4L8.js","name":"routing","imports":["_web-B77D8VL7.js"]},"_server-runtime-C6utdK21.js":{"file":"assets/server-runtime-C6utdK21.js","name":"server-runtime"},"_users-C72Eb6nw.js":{"file":"assets/users-C72Eb6nw.js","name":"users","imports":["_server-runtime-C6utdK21.js"]},"_web-B77D8VL7.js":{"file":"assets/web-B77D8VL7.js","name":"web"},"src/components/BarcodeScanner.tsx":{"file":"assets/BarcodeScanner-CcNMGE-w.js","name":"BarcodeScanner","src":"src/components/BarcodeScanner.tsx","isDynamicEntry":true,"imports":["_web-B77D8VL7.js"]},"src/routes/[...404].tsx?pick=default&pick=$css":{"file":"assets/_...404_-DEHdqO7T.js","name":"_...404_","src":"src/routes/[...404].tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js","_HttpStatusCode-DjTx85av.js"]},"src/routes/about.tsx?pick=default&pick=$css":{"file":"assets/about-CPibYA7I.js","name":"about","src":"src/routes/about.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js"]},"src/routes/auth/login.tsx?pick=default&pick=$css":{"file":"assets/login-Dc6ZwhAi.js","name":"login","src":"src/routes/auth/login.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_server-runtime-C6utdK21.js","_Loading-dYFU-h2h.js","_action-tENG7AIF.js","_routing-D8yMn4L8.js"]},"src/routes/dashboard.tsx?pick=default&pick=$css":{"file":"assets/dashboard-CMq5HOHt.js","name":"dashboard","src":"src/routes/dashboard.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_server-runtime-C6utdK21.js","_routing-D8yMn4L8.js","_components-lAEjSgtd.js","_Loading-dYFU-h2h.js","_createAsync-DwDWr0TH.js"]},"src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css":{"file":"assets/bad-stock-C7kYTAH-.js","name":"bad-stock","src":"src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js"]},"src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css":{"file":"assets/barang-keluar-DYmJwA3q.js","name":"barang-keluar","src":"src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js"]},"src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css":{"file":"assets/barang-masuk-BRyqJpYU.js","name":"barang-masuk","src":"src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js"]},"src/routes/dashboard/index.tsx?pick=default&pick=$css":{"file":"assets/index-D90WEW3r.js","name":"index","src":"src/routes/dashboard/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_server-runtime-C6utdK21.js","_index-D0gPe-Qg.js","_createAsync-DwDWr0TH.js"]},"src/routes/dashboard/main.tsx?pick=default&pick=$css":{"file":"assets/main-bWtj_JCV.js","name":"main","src":"src/routes/dashboard/main.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_components-lAEjSgtd.js","_routing-D8yMn4L8.js"]},"src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css":{"file":"assets/edit-Be4KZO-Q.js","name":"edit","src":"src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js","_products-Bt1scIOC.js","_ProductForm-DsQCavUB.js","_Loading-dYFU-h2h.js","_routing-D8yMn4L8.js","_createAsync-DwDWr0TH.js","_server-runtime-C6utdK21.js","_preload-helper-ug3pwPZ1.js","_Button-lI7l4pQ1.js"]},"src/routes/dashboard/produk/create.tsx?pick=default&pick=$css":{"file":"assets/create-DLMF0B8x.js","name":"create","src":"src/routes/dashboard/produk/create.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js","_products-Bt1scIOC.js","_ProductForm-DsQCavUB.js","_routing-D8yMn4L8.js","_server-runtime-C6utdK21.js","_preload-helper-ug3pwPZ1.js","_Button-lI7l4pQ1.js"]},"src/routes/dashboard/produk/index.tsx?pick=default&pick=$css":{"file":"assets/index-BwmaBC60.js","name":"index","src":"src/routes/dashboard/produk/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js","_products-Bt1scIOC.js","_components-lAEjSgtd.js","_createAsync-DwDWr0TH.js","_server-runtime-C6utdK21.js","_routing-D8yMn4L8.js"]},"src/routes/dashboard/settings.tsx?pick=default&pick=$css":{"file":"assets/settings-BCP4ZAFe.js","name":"settings","src":"src/routes/dashboard/settings.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js"]},"src/routes/dashboard/users/[id].tsx?pick=default&pick=$css":{"file":"assets/_id_-l9tvnHXo.js","name":"_id_","src":"src/routes/dashboard/users/[id].tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js","_users-C72Eb6nw.js","_UserForm-ri37YpI2.js","_routing-D8yMn4L8.js","_createAsync-DwDWr0TH.js","_server-runtime-C6utdK21.js","_Button-lI7l4pQ1.js"]},"src/routes/dashboard/users/create.tsx?pick=default&pick=$css":{"file":"assets/create-tqVW4jW7.js","name":"create","src":"src/routes/dashboard/users/create.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js","_users-C72Eb6nw.js","_UserForm-ri37YpI2.js","_routing-D8yMn4L8.js","_server-runtime-C6utdK21.js","_Button-lI7l4pQ1.js"]},"src/routes/dashboard/users/index.tsx?pick=default&pick=$css":{"file":"assets/index-CWzKkoAN.js","name":"index","src":"src/routes/dashboard/users/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js","_users-C72Eb6nw.js","_createAsync-DwDWr0TH.js","_components-lAEjSgtd.js","_server-runtime-C6utdK21.js","_routing-D8yMn4L8.js"]},"src/routes/index.tsx?pick=default&pick=$css":{"file":"assets/index-Crk1m6o4.js","name":"index","src":"src/routes/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_web-B77D8VL7.js","_server-runtime-C6utdK21.js","_createAsync-DwDWr0TH.js","_components-lAEjSgtd.js","_routing-D8yMn4L8.js"]},"virtual:$vinxi/handler/client":{"file":"assets/client-C_GcLkmU.js","name":"client","src":"virtual:$vinxi/handler/client","isEntry":true,"imports":["_web-B77D8VL7.js","_index-D0gPe-Qg.js","_preload-helper-ug3pwPZ1.js","_Loading-dYFU-h2h.js","_routing-D8yMn4L8.js","_action-tENG7AIF.js","_HttpStatusCode-DjTx85av.js"],"dynamicImports":["src/routes/[...404].tsx?pick=default&pick=$css","src/routes/about.tsx?pick=default&pick=$css","src/routes/auth/login.tsx?pick=default&pick=$css","src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css","src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css","src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css","src/routes/dashboard/index.tsx?pick=default&pick=$css","src/routes/dashboard/main.tsx?pick=default&pick=$css","src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css","src/routes/dashboard/produk/create.tsx?pick=default&pick=$css","src/routes/dashboard/produk/index.tsx?pick=default&pick=$css","src/routes/dashboard/settings.tsx?pick=default&pick=$css","src/routes/dashboard/users/[id].tsx?pick=default&pick=$css","src/routes/dashboard/users/create.tsx?pick=default&pick=$css","src/routes/dashboard/users/index.tsx?pick=default&pick=$css","src/routes/dashboard.tsx?pick=default&pick=$css","src/routes/index.tsx?pick=default&pick=$css"],"css":["assets/client-DojVWHVh.css"]}},"server-fns":{"_Button-BuAho1tZ.js":{"file":"assets/Button-BuAho1tZ.js","name":"Button"},"_Loading-b-bAnbUN.js":{"file":"assets/Loading-b-bAnbUN.js","name":"Loading"},"_ProductForm-CMxez_KK.js":{"file":"assets/ProductForm-CMxez_KK.js","name":"ProductForm","imports":["_Button-BuAho1tZ.js"],"dynamicImports":["src/components/BarcodeScanner.tsx"]},"_UserForm-B0Y6JnWz.js":{"file":"assets/UserForm-B0Y6JnWz.js","name":"UserForm","imports":["_Button-BuAho1tZ.js"]},"_action-CnXm9LBs.js":{"file":"assets/action-CnXm9LBs.js","name":"action","imports":["_routing-CMRlbYJP.js"]},"_components-2Zj0uUoj.js":{"file":"assets/components-2Zj0uUoj.js","name":"components","imports":["_routing-CMRlbYJP.js"]},"_createAsync-CBz8AaaQ.js":{"file":"assets/createAsync-CBz8AaaQ.js","name":"createAsync"},"_fetchEvent-CIpVWTXg.js":{"file":"assets/fetchEvent-CIpVWTXg.js","name":"fetchEvent","isDynamicEntry":true},"_index-Dps0aSs2.js":{"file":"assets/index-Dps0aSs2.js","name":"index"},"_products-BWm0EwFZ.js":{"file":"assets/products-BWm0EwFZ.js","name":"products","imports":["_server-fns-runtime-HUGH5Jm0.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"_routing-CMRlbYJP.js":{"file":"assets/routing-CMRlbYJP.js","name":"routing"},"_schema-DxiP6MVG.js":{"file":"assets/schema-DxiP6MVG.js","name":"schema","isDynamicEntry":true},"_server-fns-Dijjw6ZU.js":{"file":"assets/server-fns-Dijjw6ZU.js","name":"server-fns","imports":["_fetchEvent-CIpVWTXg.js"],"dynamicImports":["src/routes/[...404].tsx?pick=default&pick=$css","src/routes/[...404].tsx?pick=default&pick=$css","src/routes/about.tsx?pick=default&pick=$css","src/routes/about.tsx?pick=default&pick=$css","src/routes/auth/login.tsx?pick=default&pick=$css","src/routes/auth/login.tsx?pick=default&pick=$css","src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css","src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css","src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css","src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css","src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css","src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css","src/routes/dashboard/index.tsx?pick=default&pick=$css","src/routes/dashboard/index.tsx?pick=default&pick=$css","src/routes/dashboard/main.tsx?pick=default&pick=$css","src/routes/dashboard/main.tsx?pick=default&pick=$css","src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css","src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css","src/routes/dashboard/produk/create.tsx?pick=default&pick=$css","src/routes/dashboard/produk/create.tsx?pick=default&pick=$css","src/routes/dashboard/produk/index.tsx?pick=default&pick=$css","src/routes/dashboard/produk/index.tsx?pick=default&pick=$css","src/routes/dashboard/settings.tsx?pick=default&pick=$css","src/routes/dashboard/settings.tsx?pick=default&pick=$css","src/routes/dashboard/users/[id].tsx?pick=default&pick=$css","src/routes/dashboard/users/[id].tsx?pick=default&pick=$css","src/routes/dashboard/users/create.tsx?pick=default&pick=$css","src/routes/dashboard/users/create.tsx?pick=default&pick=$css","src/routes/dashboard/users/index.tsx?pick=default&pick=$css","src/routes/dashboard/users/index.tsx?pick=default&pick=$css","src/routes/dashboard.tsx?pick=default&pick=$css","src/routes/dashboard.tsx?pick=default&pick=$css","src/routes/index.tsx?pick=default&pick=$css","src/routes/index.tsx?pick=default&pick=$css","src/routes/auth/login.tsx?pick=default&pick=%24css&tsr-directive-use-server=","src/routes/dashboard/index.tsx?pick=default&pick=%24css&tsr-directive-use-server=","src/routes/dashboard.tsx?pick=default&pick=%24css&tsr-directive-use-server=","src/lib/auth-checks.ts?tsr-directive-use-server=","src/lib/users.ts?tsr-directive-use-server=","src/lib/users.ts?tsr-directive-use-server=","src/lib/users.ts?tsr-directive-use-server=","src/lib/users.ts?tsr-directive-use-server=","src/lib/users.ts?tsr-directive-use-server=","src/lib/products.ts?tsr-directive-use-server=","src/lib/products.ts?tsr-directive-use-server=","src/lib/products.ts?tsr-directive-use-server=","src/lib/products.ts?tsr-directive-use-server=","src/lib/products.ts?tsr-directive-use-server=","src/lib/session.ts?tsr-directive-use-server=","src/lib/session.ts?tsr-directive-use-server=","src/lib/session.ts?tsr-directive-use-server=","src/app.tsx"]},"_server-fns-runtime-HUGH5Jm0.js":{"file":"assets/server-fns-runtime-HUGH5Jm0.js","name":"server-fns-runtime","imports":["_fetchEvent-CIpVWTXg.js"]},"_users-BYnp0MmX.js":{"file":"assets/users-BYnp0MmX.js","name":"users","imports":["_server-fns-runtime-HUGH5Jm0.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/app.tsx":{"file":"assets/app-C76_G7l3.js","name":"app","src":"src/app.tsx","isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_server-fns-Dijjw6ZU.js","_Loading-b-bAnbUN.js","_routing-CMRlbYJP.js","_action-CnXm9LBs.js","_fetchEvent-CIpVWTXg.js"],"css":["assets/app-COWpUkC8.css"]},"src/components/BarcodeScanner.tsx":{"file":"assets/BarcodeScanner-CiYZ4G5B.js","name":"BarcodeScanner","src":"src/components/BarcodeScanner.tsx","isDynamicEntry":true},"src/db/index.ts":{"file":"assets/index-BinUX9hy.js","name":"index","src":"src/db/index.ts","isDynamicEntry":true,"imports":["_schema-DxiP6MVG.js"]},"src/lib/auth-checks.ts?tsr-directive-use-server=":{"file":"assets/auth-checks-BwLvXVBd.js","name":"auth-checks","src":"src/lib/auth-checks.ts?tsr-directive-use-server=","isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","src/lib/session.ts","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/lib/products.ts?tsr-directive-use-server=":{"file":"assets/products-QOPIUUBV.js","name":"products","src":"src/lib/products.ts?tsr-directive-use-server=","isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","src/db/index.ts","_schema-DxiP6MVG.js","_fetchEvent-CIpVWTXg.js"]},"src/lib/session.ts":{"file":"assets/session-D_Gl5yQj.js","name":"session","src":"src/lib/session.ts","isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/lib/session.ts?tsr-directive-use-server=":{"file":"assets/session-C4pX75Tv.js","name":"session","src":"src/lib/session.ts?tsr-directive-use-server=","isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/lib/users.ts?tsr-directive-use-server=":{"file":"assets/users-DUDoXUFs.js","name":"users","src":"src/lib/users.ts?tsr-directive-use-server=","isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","src/db/index.ts","_schema-DxiP6MVG.js","_fetchEvent-CIpVWTXg.js"]},"src/routes/[...404].tsx?pick=default&pick=$css":{"file":"_...404_.js","name":"_...404_","src":"src/routes/[...404].tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/about.tsx?pick=default&pick=$css":{"file":"about.js","name":"about","src":"src/routes/about.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/auth/login.tsx?pick=default&pick=$css":{"file":"login.js","name":"login","src":"src/routes/auth/login.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","_Loading-b-bAnbUN.js","_action-CnXm9LBs.js","_fetchEvent-CIpVWTXg.js","_routing-CMRlbYJP.js"],"dynamicImports":["src/db/index.ts","_schema-DxiP6MVG.js","_fetchEvent-CIpVWTXg.js","src/lib/session.ts"]},"src/routes/auth/login.tsx?pick=default&pick=%24css&tsr-directive-use-server=":{"file":"assets/login-CGNBHsLW.js","name":"login","src":"src/routes/auth/login.tsx?pick=default&pick=%24css&tsr-directive-use-server=","isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js"],"dynamicImports":["src/db/index.ts","_schema-DxiP6MVG.js","_fetchEvent-CIpVWTXg.js","src/lib/session.ts"]},"src/routes/dashboard.tsx?pick=default&pick=$css":{"file":"dashboard.js","name":"dashboard","src":"src/routes/dashboard.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","src/lib/session.ts","_routing-CMRlbYJP.js","_components-2Zj0uUoj.js","_Loading-b-bAnbUN.js","_createAsync-CBz8AaaQ.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/routes/dashboard.tsx?pick=default&pick=%24css&tsr-directive-use-server=":{"file":"assets/dashboard-D5mZp-20.js","name":"dashboard","src":"src/routes/dashboard.tsx?pick=default&pick=%24css&tsr-directive-use-server=","isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","src/lib/session.ts","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js"]},"src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css":{"file":"bad-stock.js","name":"bad-stock","src":"src/routes/dashboard/bad-stock.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css":{"file":"barang-keluar.js","name":"barang-keluar","src":"src/routes/dashboard/barang-keluar.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css":{"file":"barang-masuk.js","name":"barang-masuk","src":"src/routes/dashboard/barang-masuk.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/dashboard/index.tsx?pick=default&pick=$css":{"file":"index.js","name":"index","src":"src/routes/dashboard/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","_index-Dps0aSs2.js","_createAsync-CBz8AaaQ.js","_fetchEvent-CIpVWTXg.js"],"dynamicImports":["src/lib/session.ts"]},"src/routes/dashboard/index.tsx?pick=default&pick=%24css&tsr-directive-use-server=":{"file":"assets/index-D39yfOTr.js","name":"index","src":"src/routes/dashboard/index.tsx?pick=default&pick=%24css&tsr-directive-use-server=","isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js"],"dynamicImports":["src/lib/session.ts"]},"src/routes/dashboard/main.tsx?pick=default&pick=$css":{"file":"main.js","name":"main","src":"src/routes/dashboard/main.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_components-2Zj0uUoj.js","_routing-CMRlbYJP.js"]},"src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css":{"file":"edit.js","name":"edit","src":"src/routes/dashboard/produk/[id]/edit.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_products-BWm0EwFZ.js","_ProductForm-CMxez_KK.js","_Loading-b-bAnbUN.js","_routing-CMRlbYJP.js","_createAsync-CBz8AaaQ.js","_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js","_Button-BuAho1tZ.js"]},"src/routes/dashboard/produk/create.tsx?pick=default&pick=$css":{"file":"create.js","name":"create","src":"src/routes/dashboard/produk/create.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_products-BWm0EwFZ.js","_ProductForm-CMxez_KK.js","_routing-CMRlbYJP.js","_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js","_Button-BuAho1tZ.js"]},"src/routes/dashboard/produk/index.tsx?pick=default&pick=$css":{"file":"index2.js","name":"index","src":"src/routes/dashboard/produk/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_products-BWm0EwFZ.js","_components-2Zj0uUoj.js","_createAsync-CBz8AaaQ.js","_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js","_routing-CMRlbYJP.js"]},"src/routes/dashboard/settings.tsx?pick=default&pick=$css":{"file":"settings.js","name":"settings","src":"src/routes/dashboard/settings.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js"]},"src/routes/dashboard/users/[id].tsx?pick=default&pick=$css":{"file":"_id_.js","name":"_id_","src":"src/routes/dashboard/users/[id].tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_users-BYnp0MmX.js","_UserForm-B0Y6JnWz.js","_routing-CMRlbYJP.js","_createAsync-CBz8AaaQ.js","_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js","_Button-BuAho1tZ.js"]},"src/routes/dashboard/users/create.tsx?pick=default&pick=$css":{"file":"create2.js","name":"create","src":"src/routes/dashboard/users/create.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_users-BYnp0MmX.js","_UserForm-B0Y6JnWz.js","_routing-CMRlbYJP.js","_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js","_Button-BuAho1tZ.js"]},"src/routes/dashboard/users/index.tsx?pick=default&pick=$css":{"file":"index3.js","name":"index","src":"src/routes/dashboard/users/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_index-Dps0aSs2.js","_users-BYnp0MmX.js","_createAsync-CBz8AaaQ.js","_components-2Zj0uUoj.js","_server-fns-runtime-HUGH5Jm0.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js","_routing-CMRlbYJP.js"]},"src/routes/index.tsx?pick=default&pick=$css":{"file":"index4.js","name":"index","src":"src/routes/index.tsx?pick=default&pick=$css","isEntry":true,"isDynamicEntry":true,"imports":["_server-fns-runtime-HUGH5Jm0.js","src/lib/session.ts","_createAsync-CBz8AaaQ.js","_components-2Zj0uUoj.js","_fetchEvent-CIpVWTXg.js","src/db/index.ts","_schema-DxiP6MVG.js","_routing-CMRlbYJP.js"]},"virtual:$vinxi/handler/server-fns":{"file":"server-fns.js","name":"server-fns","src":"virtual:$vinxi/handler/server-fns","isEntry":true,"imports":["_server-fns-Dijjw6ZU.js","_fetchEvent-CIpVWTXg.js"]}}};
 
 					const routeManifest = {"ssr":{},"client":{},"server-fns":{}};
 
@@ -4488,10 +4778,10 @@ plugin,
 app
 ];
 
-function parseSetCookie$1(setCookieValue, options) {
+function parseSetCookie(setCookieValue, options) {
   const parts = (setCookieValue || "").split(";").filter((str) => typeof str === "string" && !!str.trim());
   const nameValuePairStr = parts.shift() || "";
-  const parsed = _parseNameValuePair$1(nameValuePairStr);
+  const parsed = _parseNameValuePair(nameValuePairStr);
   const name = parsed.name;
   let value = parsed.value;
   try {
@@ -4534,7 +4824,7 @@ function parseSetCookie$1(setCookieValue, options) {
   }
   return cookie;
 }
-function _parseNameValuePair$1(nameValuePairStr) {
+function _parseNameValuePair(nameValuePairStr) {
   let name = "";
   let value = "";
   const nameValueArr = nameValuePairStr.split("=");
@@ -4546,643 +4836,6 @@ function _parseNameValuePair$1(nameValuePairStr) {
   }
   return { name, value };
 }
-
-const kEventNS = "h3.internal.event.";
-const kEventRes = /* @__PURE__ */ Symbol.for(`${kEventNS}res`);
-const kEventResHeaders = /* @__PURE__ */ Symbol.for(`${kEventNS}res.headers`);
-var H3Event = class {
-	
-	app;
-	
-	req;
-	
-	url;
-	
-	context;
-	
-	static __is_event__ = true;
-	constructor(req, context, app) {
-		this.context = context || req.context || new NullProtoObj();
-		this.req = req;
-		this.app = app;
-		const _url = req._url;
-		this.url = _url && _url instanceof URL ? _url : new FastURL(req.url);
-	}
-	
-	get res() {
-		return this[kEventRes] ||= new H3EventResponse();
-	}
-	
-	get runtime() {
-		return this.req.runtime;
-	}
-	
-	waitUntil(promise) {
-		this.req.waitUntil?.(promise);
-	}
-	toString() {
-		return `[${this.req.method}] ${this.req.url}`;
-	}
-	toJSON() {
-		return this.toString();
-	}
-	
-	get node() {
-		return this.req.runtime?.node;
-	}
-	
-	get headers() {
-		return this.req.headers;
-	}
-	
-	get path() {
-		return this.url.pathname + this.url.search;
-	}
-	
-	get method() {
-		return this.req.method;
-	}
-};
-var H3EventResponse = class {
-	status;
-	statusText;
-	get headers() {
-		return this[kEventResHeaders] ||= new Headers();
-	}
-};
-
-const DISALLOWED_STATUS_CHARS = /[^\u0009\u0020-\u007E]/g;
-
-function sanitizeStatusMessage(statusMessage = "") {
-	return statusMessage.replace(DISALLOWED_STATUS_CHARS, "");
-}
-
-function sanitizeStatusCode(statusCode, defaultStatusCode = 200) {
-	if (!statusCode) return defaultStatusCode;
-	if (typeof statusCode === "string") statusCode = +statusCode;
-	if (statusCode < 100 || statusCode > 599) return defaultStatusCode;
-	return statusCode;
-}
-
-
-var HTTPError = class HTTPError extends Error {
-	get name() {
-		return "HTTPError";
-	}
-	
-	status;
-	
-	statusText;
-	
-	headers;
-	
-	cause;
-	
-	data;
-	
-	body;
-	
-	unhandled;
-	
-	static isError(input) {
-		return input instanceof Error && input?.name === "HTTPError";
-	}
-	
-	static status(status, statusText, details) {
-		return new HTTPError({
-			...details,
-			statusText,
-			status
-		});
-	}
-	constructor(arg1, arg2) {
-		let messageInput;
-		let details;
-		if (typeof arg1 === "string") {
-			messageInput = arg1;
-			details = arg2;
-		} else details = arg1;
-		const status = sanitizeStatusCode(details?.status || (details?.cause)?.status || details?.status || details?.statusCode, 500);
-		const statusText = sanitizeStatusMessage(details?.statusText || (details?.cause)?.statusText || details?.statusText || details?.statusMessage);
-		const message = messageInput || details?.message || (details?.cause)?.message || details?.statusText || details?.statusMessage || [
-			"HTTPError",
-			status,
-			statusText
-		].filter(Boolean).join(" ");
-		super(message, { cause: details });
-		this.cause = details;
-		this.status = status;
-		this.statusText = statusText || void 0;
-		const rawHeaders = details?.headers || (details?.cause)?.headers;
-		this.headers = rawHeaders ? new Headers(rawHeaders) : void 0;
-		this.unhandled = details?.unhandled ?? (details?.cause)?.unhandled ?? void 0;
-		this.data = details?.data;
-		this.body = details?.body;
-	}
-	
-	get statusCode() {
-		return this.status;
-	}
-	
-	get statusMessage() {
-		return this.statusText;
-	}
-	toJSON() {
-		const unhandled = this.unhandled;
-		return {
-			status: this.status,
-			statusText: this.statusText,
-			unhandled,
-			message: unhandled ? "HTTPError" : this.message,
-			data: unhandled ? void 0 : this.data,
-			...unhandled ? void 0 : this.body
-		};
-	}
-};
-function isJSONSerializable(value, _type) {
-	if (value === null || value === void 0) return true;
-	if (_type !== "object") return _type === "boolean" || _type === "number" || _type === "string";
-	if (typeof value.toJSON === "function") return true;
-	if (Array.isArray(value)) return true;
-	if (typeof value.pipe === "function" || typeof value.pipeTo === "function") return false;
-	if (value instanceof NullProtoObj) return true;
-	const proto = Object.getPrototypeOf(value);
-	return proto === Object.prototype || proto === null;
-}
-
-const kNotFound = /* @__PURE__ */ Symbol.for("h3.notFound");
-const kHandled = /* @__PURE__ */ Symbol.for("h3.handled");
-function toResponse(val, event, config = {}) {
-	if (typeof val?.then === "function") return (val.catch?.((error) => error) || Promise.resolve(val)).then((resolvedVal) => toResponse(resolvedVal, event, config));
-	const response = prepareResponse(val, event, config);
-	if (typeof response?.then === "function") return toResponse(response, event, config);
-	const { onResponse: onResponse$1 } = config;
-	return onResponse$1 ? Promise.resolve(onResponse$1(response, event)).then(() => response) : response;
-}
-var HTTPResponse = class {
-	#headers;
-	#init;
-	body;
-	constructor(body, init) {
-		this.body = body;
-		this.#init = init;
-	}
-	get status() {
-		return this.#init?.status || 200;
-	}
-	get statusText() {
-		return this.#init?.statusText || "OK";
-	}
-	get headers() {
-		return this.#headers ||= new Headers(this.#init?.headers);
-	}
-};
-function prepareResponse(val, event, config, nested) {
-	if (val === kHandled) return new FastResponse(null);
-	if (val === kNotFound) val = new HTTPError({
-		status: 404,
-		message: `Cannot find any route matching [${event.req.method}] ${event.url}`
-	});
-	if (val && val instanceof Error) {
-		const isHTTPError = HTTPError.isError(val);
-		const error = isHTTPError ? val : new HTTPError(val);
-		if (!isHTTPError) {
-			error.unhandled = true;
-			if (val?.stack) error.stack = val.stack;
-		}
-		if (error.unhandled && !config.silent) console.error(error);
-		const { onError: onError$1 } = config;
-		return onError$1 && !nested ? Promise.resolve(onError$1(error, event)).catch((error$1) => error$1).then((newVal) => prepareResponse(newVal ?? val, event, config, true)) : errorResponse(error, config.debug);
-	}
-	const preparedRes = event[kEventRes];
-	const preparedHeaders = preparedRes?.[kEventResHeaders];
-	event[kEventRes] = void 0;
-	if (!(val instanceof Response)) {
-		const res = prepareResponseBody(val, event, config);
-		const status = res.status || preparedRes?.status;
-		return new FastResponse(nullBody(event.req.method, status) ? null : res.body, {
-			status,
-			statusText: res.statusText || preparedRes?.statusText,
-			headers: res.headers && preparedHeaders ? mergeHeaders$1(res.headers, preparedHeaders) : res.headers || preparedHeaders
-		});
-	}
-	if (!preparedHeaders || nested || !val.ok) return val;
-	try {
-		mergeHeaders$1(val.headers, preparedHeaders, val.headers);
-		return val;
-	} catch {
-		return new FastResponse(nullBody(event.req.method, val.status) ? null : val.body, {
-			status: val.status,
-			statusText: val.statusText,
-			headers: mergeHeaders$1(val.headers, preparedHeaders)
-		});
-	}
-}
-function mergeHeaders$1(base, overrides, target = new Headers(base)) {
-	for (const [name, value] of overrides) if (name === "set-cookie") target.append(name, value);
-	else target.set(name, value);
-	return target;
-}
-const frozenHeaders = () => {
-	throw new Error("Headers are frozen");
-};
-var FrozenHeaders = class extends Headers {
-	constructor(init) {
-		super(init);
-		this.set = this.append = this.delete = frozenHeaders;
-	}
-};
-const emptyHeaders = /* @__PURE__ */ new FrozenHeaders({ "content-length": "0" });
-const jsonHeaders = /* @__PURE__ */ new FrozenHeaders({ "content-type": "application/json;charset=UTF-8" });
-function prepareResponseBody(val, event, config) {
-	if (val === null || val === void 0) return {
-		body: "",
-		headers: emptyHeaders
-	};
-	const valType = typeof val;
-	if (valType === "string") return { body: val };
-	if (val instanceof Uint8Array) {
-		event.res.headers.set("content-length", val.byteLength.toString());
-		return { body: val };
-	}
-	if (val instanceof HTTPResponse || val?.constructor?.name === "HTTPResponse") return val;
-	if (isJSONSerializable(val, valType)) return {
-		body: JSON.stringify(val, void 0, config.debug ? 2 : void 0),
-		headers: jsonHeaders
-	};
-	if (valType === "bigint") return {
-		body: val.toString(),
-		headers: jsonHeaders
-	};
-	if (val instanceof Blob) {
-		const headers = new Headers({
-			"content-type": val.type,
-			"content-length": val.size.toString()
-		});
-		let filename = val.name;
-		if (filename) {
-			filename = encodeURIComponent(filename);
-			headers.set("content-disposition", `filename="${filename}"; filename*=UTF-8''${filename}`);
-		}
-		return {
-			body: val.stream(),
-			headers
-		};
-	}
-	if (valType === "symbol") return { body: val.toString() };
-	if (valType === "function") return { body: `${val.name}()` };
-	return { body: val };
-}
-function nullBody(method, status) {
-	return method === "HEAD" || status === 100 || status === 101 || status === 102 || status === 204 || status === 205 || status === 304;
-}
-function errorResponse(error, debug) {
-	return new FastResponse(JSON.stringify({
-		...error.toJSON(),
-		stack: debug && error.stack ? error.stack.split("\n").map((l) => l.trim()) : void 0
-	}, void 0, debug ? 2 : void 0), {
-		status: error.status,
-		statusText: error.statusText,
-		headers: error.headers ? mergeHeaders$1(jsonHeaders, error.headers) : new Headers(jsonHeaders)
-	});
-}
-function callMiddleware(event, middleware, handler, index = 0) {
-	if (index === middleware.length) return handler(event);
-	const fn = middleware[index];
-	let nextCalled;
-	let nextResult;
-	const next = () => {
-		if (nextCalled) return nextResult;
-		nextCalled = true;
-		nextResult = callMiddleware(event, middleware, handler, index + 1);
-		return nextResult;
-	};
-	const ret = fn(event, next);
-	return isUnhandledResponse(ret) ? next() : typeof ret?.then === "function" ? ret.then((resolved) => isUnhandledResponse(resolved) ? next() : resolved) : ret;
-}
-function isUnhandledResponse(val) {
-	return val === void 0 || val === kNotFound;
-}
-
-function getRequestHost(event, opts = {}) {
-	if (opts.xForwardedHost) {
-		const xForwardedHost = (event.req.headers.get("x-forwarded-host") || "").split(",").shift()?.trim();
-		if (xForwardedHost) return xForwardedHost;
-	}
-	return event.req.headers.get("host") || "";
-}
-
-function getRequestProtocol(event, opts = {}) {
-	if (opts.xForwardedProto !== false) {
-		const forwardedProto = event.req.headers.get("x-forwarded-proto");
-		if (forwardedProto === "https") return "https";
-		if (forwardedProto === "http") return "http";
-	}
-	return (event.url || new URL(event.req.url)).protocol.slice(0, -1);
-}
-
-function getRequestURL(event, opts = {}) {
-	const url = new URL(event.url || event.req.url);
-	url.protocol = getRequestProtocol(event, opts);
-	if (opts.xForwardedHost) {
-		const host = getRequestHost(event, opts);
-		if (host) {
-			url.host = host;
-			if (!host.includes(":")) url.port = "";
-		}
-	}
-	return url;
-}
-
-function getRequestIP(event, opts = {}) {
-	if (opts.xForwardedFor) {
-		const _header = event.req.headers.get("x-forwarded-for");
-		if (_header) {
-			const xForwardedFor = _header.split(",")[0].trim();
-			if (xForwardedFor) return xForwardedFor;
-		}
-	}
-	return event.req.context?.clientAddress || event.req.ip || void 0;
-}
-
-function defineHandler(input) {
-	if (typeof input === "function") return handlerWithFetch(input);
-	const handler = input.handler || (input.fetch ? function _fetchHandler(event) {
-		return input.fetch(event.req);
-	} : NoHandler);
-	return Object.assign(handlerWithFetch(input.middleware?.length ? function _handlerMiddleware(event) {
-		return callMiddleware(event, input.middleware, handler);
-	} : handler), input);
-}
-function handlerWithFetch(handler) {
-	if ("fetch" in handler) return handler;
-	return Object.assign(handler, { fetch: (req) => {
-		if (typeof req === "string") req = new URL(req, "http://_");
-		if (req instanceof URL) req = new Request(req);
-		const event = new H3Event(req);
-		try {
-			return Promise.resolve(toResponse(handler(event), event));
-		} catch (error) {
-			return Promise.resolve(toResponse(error, event));
-		}
-	} });
-}
-
-const NoHandler = () => kNotFound;
-
-function redirect(location, status = 302, statusText) {
-	return new HTTPResponse(`<html><head><meta http-equiv="refresh" content="0; url=${location.replace(/"/g, "%22")}" /></head></html>`, {
-		status,
-		statusText: (status === 301 ? "Moved Permanently" : "Found"),
-		headers: {
-			"content-type": "text/html; charset=utf-8",
-			location
-		}
-	});
-}
-
-function parse(str, options) {
-	if (typeof str !== "string") throw new TypeError("argument str must be a string");
-	const obj = {};
-	const opt = {};
-	const dec = opt.decode || decode;
-	let index = 0;
-	while (index < str.length) {
-		const eqIdx = str.indexOf("=", index);
-		if (eqIdx === -1) break;
-		let endIdx = str.indexOf(";", index);
-		if (endIdx === -1) endIdx = str.length;
-		else if (endIdx < eqIdx) {
-			index = str.lastIndexOf(";", eqIdx - 1) + 1;
-			continue;
-		}
-		const key = str.slice(index, eqIdx).trim();
-		if (opt?.filter && !opt?.filter(key)) {
-			index = endIdx + 1;
-			continue;
-		}
-		if (void 0 === obj[key]) {
-			let val = str.slice(eqIdx + 1, endIdx).trim();
-			if (val.codePointAt(0) === 34) val = val.slice(1, -1);
-			obj[key] = tryDecode(val, dec);
-		}
-		index = endIdx + 1;
-	}
-	return obj;
-}
-function decode(str) {
-	return str.includes("%") ? decodeURIComponent(str) : str;
-}
-function tryDecode(str, decode2) {
-	try {
-		return decode2(str);
-	} catch {
-		return str;
-	}
-}
-const fieldContentRegExp = /^[\u0009\u0020-\u007E\u0080-\u00FF]+$/;
-function serialize(name, value, options) {
-	const opt = options || {};
-	const enc = opt.encode || encodeURIComponent;
-	if (typeof enc !== "function") throw new TypeError("option encode is invalid");
-	if (!fieldContentRegExp.test(name)) throw new TypeError("argument name is invalid");
-	const encodedValue = enc(value);
-	if (encodedValue && !fieldContentRegExp.test(encodedValue)) throw new TypeError("argument val is invalid");
-	let str = name + "=" + encodedValue;
-	if (void 0 !== opt.maxAge && opt.maxAge !== null) {
-		const maxAge = opt.maxAge - 0;
-		if (Number.isNaN(maxAge) || !Number.isFinite(maxAge)) throw new TypeError("option maxAge is invalid");
-		str += "; Max-Age=" + Math.floor(maxAge);
-	}
-	if (opt.domain) {
-		if (!fieldContentRegExp.test(opt.domain)) throw new TypeError("option domain is invalid");
-		str += "; Domain=" + opt.domain;
-	}
-	if (opt.path) {
-		if (!fieldContentRegExp.test(opt.path)) throw new TypeError("option path is invalid");
-		str += "; Path=" + opt.path;
-	}
-	if (opt.expires) {
-		if (!isDate(opt.expires) || Number.isNaN(opt.expires.valueOf())) throw new TypeError("option expires is invalid");
-		str += "; Expires=" + opt.expires.toUTCString();
-	}
-	if (opt.httpOnly) str += "; HttpOnly";
-	if (opt.secure) str += "; Secure";
-	if (opt.priority) switch (typeof opt.priority === "string" ? opt.priority.toLowerCase() : opt.priority) {
-		case "low":
-			str += "; Priority=Low";
-			break;
-		case "medium":
-			str += "; Priority=Medium";
-			break;
-		case "high":
-			str += "; Priority=High";
-			break;
-		default: throw new TypeError("option priority is invalid");
-	}
-	if (opt.sameSite) switch (typeof opt.sameSite === "string" ? opt.sameSite.toLowerCase() : opt.sameSite) {
-		case true:
-			str += "; SameSite=Strict";
-			break;
-		case "lax":
-			str += "; SameSite=Lax";
-			break;
-		case "strict":
-			str += "; SameSite=Strict";
-			break;
-		case "none":
-			str += "; SameSite=None";
-			break;
-		default: throw new TypeError("option sameSite is invalid");
-	}
-	if (opt.partitioned) str += "; Partitioned";
-	return str;
-}
-function isDate(val) {
-	return Object.prototype.toString.call(val) === "[object Date]" || val instanceof Date;
-}
-function parseSetCookie(setCookieValue, options) {
-	const parts = (setCookieValue || "").split(";").filter((str) => typeof str === "string" && !!str.trim());
-	const parsed = _parseNameValuePair(parts.shift() || "");
-	const name = parsed.name;
-	let value = parsed.value;
-	try {
-		value = options?.decode === false ? value : (options?.decode || decodeURIComponent)(value);
-	} catch {}
-	const cookie = {
-		name,
-		value
-	};
-	for (const part of parts) {
-		const sides = part.split("=");
-		const partKey = (sides.shift() || "").trimStart().toLowerCase();
-		const partValue = sides.join("=");
-		switch (partKey) {
-			case "expires":
-				cookie.expires = new Date(partValue);
-				break;
-			case "max-age":
-				cookie.maxAge = Number.parseInt(partValue, 10);
-				break;
-			case "secure":
-				cookie.secure = true;
-				break;
-			case "httponly":
-				cookie.httpOnly = true;
-				break;
-			case "samesite":
-				cookie.sameSite = partValue;
-				break;
-			default: cookie[partKey] = partValue;
-		}
-	}
-	return cookie;
-}
-function _parseNameValuePair(nameValuePairStr) {
-	let name = "";
-	let value = "";
-	const nameValueArr = nameValuePairStr.split("=");
-	if (nameValueArr.length > 1) {
-		name = nameValueArr.shift();
-		value = nameValueArr.join("=");
-	} else value = nameValuePairStr;
-	return {
-		name,
-		value
-	};
-}
-
-function parseCookies(event) {
-	return parse(event.req.headers.get("cookie") || "");
-}
-
-function getCookie(event, name) {
-	return parseCookies(event)[name];
-}
-
-function setCookie(event, name, value, options) {
-	const newCookie = serialize(name, value, {
-		path: "/",
-		...options
-	});
-	const currentCookies = event.res.headers.getSetCookie();
-	if (currentCookies.length === 0) {
-		event.res.headers.set("set-cookie", newCookie);
-		return;
-	}
-	const newCookieKey = _getDistinctCookieKey(name, options || {});
-	event.res.headers.delete("set-cookie");
-	for (const cookie of currentCookies) {
-		if (_getDistinctCookieKey(cookie.split("=")?.[0], parseSetCookie(cookie)) === newCookieKey) continue;
-		event.res.headers.append("set-cookie", cookie);
-	}
-	event.res.headers.append("set-cookie", newCookie);
-}
-
-function deleteCookie(event, name, serializeOptions) {
-	setCookie(event, name, "", {
-		...serializeOptions,
-		maxAge: 0
-	});
-}
-
-function _getDistinctCookieKey(name, options) {
-	return [
-		name,
-		options.domain || "",
-		options.path || "/"
-	].join(";");
-}
-
-new TextEncoder();
-
-function getBodyStream(event) {
-	return event.req.body || void 0;
-}
-
-const getRequestWebStream = getBodyStream;
-
-const sendRedirect = (_, loc, code) => redirect(loc, code);
-
-function getResponseStatusText(event) {
-	return event.res.statusText || "";
-}
-
-function appendResponseHeader(event, name, value) {
-	if (Array.isArray(value)) for (const valueItem of value) event.res.headers.append(name, valueItem);
-	else event.res.headers.append(name, value);
-}
-
-function setResponseHeader(event, name, value) {
-	if (Array.isArray(value)) {
-		event.res.headers.delete(name);
-		for (const valueItem of value) event.res.headers.append(name, valueItem);
-	} else event.res.headers.set(name, value);
-}
-
-const setHeader = setResponseHeader;
-
-function getResponseStatus(event) {
-	return event.res.status || 200;
-}
-
-function setResponseStatus(event, code, text) {
-	if (code) event.res.status = sanitizeStatusCode(code, event.res.status);
-	if (text) event.res.statusText = sanitizeStatusMessage(text);
-}
-
-function getResponseHeaders(event) {
-	return Object.fromEntries(event.res.headers.entries());
-}
-
-function getResponseHeader(event, name) {
-	return event.res.headers.get(name) || void 0;
-}
-
-function removeResponseHeader(event, name) {
-	return event.res.headers.delete(name);
-}
-const eventHandler$1 = defineHandler;
 
 var __defProp$2 = Object.defineProperty;
 var __defNormalProp$2 = (obj, key, value) => key in obj ? __defProp$2(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
@@ -5392,7 +5045,7 @@ const Pe$1 = /* @__PURE__ */ new Set([301, 302, 303, 307, 308]);
 function xe$1(e) {
   return e.status && Pe$1.has(e.status) ? e.status : 302;
 }
-const ye$1 = { "src_routes_dashboard_index_tsx--getAuthenticatedUser_1": { functionName: "getAuthenticatedUser_1", importer: () => import('../build/index-D39yfOTr.mjs') }, "src_routes_dashboard_tsx--protectRoute_1": { functionName: "protectRoute_1", importer: () => import('../build/dashboard-D5mZp-20.mjs') }, "src_routes_auth_login_tsx--login_action": { functionName: "login_action", importer: () => import('../build/login-CGNBHsLW.mjs') }, "src_lib_auth-checks_ts--checkSession_1": { functionName: "checkSession_1", importer: () => import('../build/auth-checks-BwLvXVBd.mjs') }, "src_lib_products_ts--getProducts_1": { functionName: "getProducts_1", importer: () => import('../build/products-QOPIUUBV.mjs') }, "src_lib_products_ts--getProduct_1": { functionName: "getProduct_1", importer: () => import('../build/products-QOPIUUBV.mjs') }, "src_lib_products_ts--createProduct_1": { functionName: "createProduct_1", importer: () => import('../build/products-QOPIUUBV.mjs') }, "src_lib_products_ts--updateProduct_1": { functionName: "updateProduct_1", importer: () => import('../build/products-QOPIUUBV.mjs') }, "src_lib_products_ts--deleteProduct_1": { functionName: "deleteProduct_1", importer: () => import('../build/products-QOPIUUBV.mjs') }, "src_lib_users_ts--getUsers_1": { functionName: "getUsers_1", importer: () => import('../build/users-DUDoXUFs.mjs') }, "src_lib_users_ts--getUser_1": { functionName: "getUser_1", importer: () => import('../build/users-DUDoXUFs.mjs') }, "src_lib_users_ts--createUser_1": { functionName: "createUser_1", importer: () => import('../build/users-DUDoXUFs.mjs') }, "src_lib_users_ts--updateUser_1": { functionName: "updateUser_1", importer: () => import('../build/users-DUDoXUFs.mjs') }, "src_lib_users_ts--deleteUser_1": { functionName: "deleteUser_1", importer: () => import('../build/users-DUDoXUFs.mjs') }, "src_lib_session_ts--getUser_1": { functionName: "getUser_1", importer: () => import('../build/session-C4pX75Tv.mjs') }, "src_lib_session_ts--createUserSession_1": { functionName: "createUserSession_1", importer: () => import('../build/session-C4pX75Tv.mjs') }, "src_lib_session_ts--logout_1": { functionName: "logout_1", importer: () => import('../build/session-C4pX75Tv.mjs') } };
+const ye$1 = { "src_routes_auth_login_tsx--login_action": { functionName: "login_action", importer: () => import('../build/login-CGNBHsLW.mjs') }, "src_routes_dashboard_index_tsx--getAuthenticatedUser_1": { functionName: "getAuthenticatedUser_1", importer: () => import('../build/index-D39yfOTr.mjs') }, "src_routes_dashboard_tsx--protectRoute_1": { functionName: "protectRoute_1", importer: () => import('../build/dashboard-D5mZp-20.mjs') }, "src_lib_auth-checks_ts--checkSession_1": { functionName: "checkSession_1", importer: () => import('../build/auth-checks-BwLvXVBd.mjs') }, "src_lib_users_ts--getUsers_1": { functionName: "getUsers_1", importer: () => import('../build/users-DUDoXUFs.mjs') }, "src_lib_users_ts--getUser_1": { functionName: "getUser_1", importer: () => import('../build/users-DUDoXUFs.mjs') }, "src_lib_users_ts--createUser_1": { functionName: "createUser_1", importer: () => import('../build/users-DUDoXUFs.mjs') }, "src_lib_users_ts--updateUser_1": { functionName: "updateUser_1", importer: () => import('../build/users-DUDoXUFs.mjs') }, "src_lib_users_ts--deleteUser_1": { functionName: "deleteUser_1", importer: () => import('../build/users-DUDoXUFs.mjs') }, "src_lib_products_ts--getProducts_1": { functionName: "getProducts_1", importer: () => import('../build/products-QOPIUUBV.mjs') }, "src_lib_products_ts--getProduct_1": { functionName: "getProduct_1", importer: () => import('../build/products-QOPIUUBV.mjs') }, "src_lib_products_ts--createProduct_1": { functionName: "createProduct_1", importer: () => import('../build/products-QOPIUUBV.mjs') }, "src_lib_products_ts--updateProduct_1": { functionName: "updateProduct_1", importer: () => import('../build/products-QOPIUUBV.mjs') }, "src_lib_products_ts--deleteProduct_1": { functionName: "deleteProduct_1", importer: () => import('../build/products-QOPIUUBV.mjs') }, "src_lib_session_ts--getUser_1": { functionName: "getUser_1", importer: () => import('../build/session-C4pX75Tv.mjs') }, "src_lib_session_ts--createUserSession_1": { functionName: "createUserSession_1", importer: () => import('../build/session-C4pX75Tv.mjs') }, "src_lib_session_ts--logout_1": { functionName: "logout_1", importer: () => import('../build/session-C4pX75Tv.mjs') } };
 function we$2(e) {
   const r = new TextEncoder().encode(e), t = r.length, a = t.toString(16), o = "00000000".substring(0, 8 - a.length) + a, n = new TextEncoder().encode(`;0x${o};`), i = new Uint8Array(12 + t);
   return i.set(n), i.set(r, 12), i;
@@ -5463,7 +5116,7 @@ function Ue$1(e) {
   let o = false;
   return ((_a = e.nativeEvent.node) == null ? void 0 : _a.req) && (o = true, e.nativeEvent.node.req.headers.cookie = ""), a.forEach((n) => {
     if (!n) return;
-    const { maxAge: i, expires: c, name: p, value: u } = parseSetCookie$1(n);
+    const { maxAge: i, expires: c, name: p, value: u } = parseSetCookie(n);
     if (i != null && i <= 0) {
       delete t[p];
       return;
@@ -5482,7 +5135,7 @@ async function A$2(e, r) {
   r instanceof Response && (r.headers.has("X-Revalidate") && (t = r.headers.get("X-Revalidate").split(",")), r.headers.has("Location") && (a = new URL(r.headers.get("Location"), new URL(e.request.url).origin + "").toString()));
   const o = se$2(e);
   return o.request = new Request(a, { headers: Ue$1(e) }), await provideRequestEvent(o, async () => {
-    await $e$2(o), _$1 || (_$1 = (await import('../build/app-DdXtN6Nq.mjs')).default), o.router.dataOnly = t || true, o.router.previousUrl = e.request.headers.get("referer");
+    await $e$2(o), _$1 || (_$1 = (await import('../build/app-C76_G7l3.mjs')).default), o.router.dataOnly = t || true, o.router.previousUrl = e.request.headers.get("referer");
     try {
       renderToString(() => {
         sharedConfig.context.event = o, _$1();

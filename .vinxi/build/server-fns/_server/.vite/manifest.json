@@ -69,8 +69,8 @@
     "name": "schema",
     "isDynamicEntry": true
   },
-  "_server-fns-DSWMe6uF.js": {
-    "file": "assets/server-fns-DSWMe6uF.js",
+  "_server-fns-Dijjw6ZU.js": {
+    "file": "assets/server-fns-Dijjw6ZU.js",
     "name": "server-fns",
     "imports": [
       "_fetchEvent-CIpVWTXg.js"
@@ -110,20 +110,20 @@
       "src/routes/dashboard.tsx?pick=default&pick=$css",
       "src/routes/index.tsx?pick=default&pick=$css",
       "src/routes/index.tsx?pick=default&pick=$css",
+      "src/routes/auth/login.tsx?pick=default&pick=%24css&tsr-directive-use-server=",
       "src/routes/dashboard/index.tsx?pick=default&pick=%24css&tsr-directive-use-server=",
       "src/routes/dashboard.tsx?pick=default&pick=%24css&tsr-directive-use-server=",
-      "src/routes/auth/login.tsx?pick=default&pick=%24css&tsr-directive-use-server=",
       "src/lib/auth-checks.ts?tsr-directive-use-server=",
-      "src/lib/products.ts?tsr-directive-use-server=",
-      "src/lib/products.ts?tsr-directive-use-server=",
-      "src/lib/products.ts?tsr-directive-use-server=",
-      "src/lib/products.ts?tsr-directive-use-server=",
-      "src/lib/products.ts?tsr-directive-use-server=",
       "src/lib/users.ts?tsr-directive-use-server=",
       "src/lib/users.ts?tsr-directive-use-server=",
       "src/lib/users.ts?tsr-directive-use-server=",
       "src/lib/users.ts?tsr-directive-use-server=",
       "src/lib/users.ts?tsr-directive-use-server=",
+      "src/lib/products.ts?tsr-directive-use-server=",
+      "src/lib/products.ts?tsr-directive-use-server=",
+      "src/lib/products.ts?tsr-directive-use-server=",
+      "src/lib/products.ts?tsr-directive-use-server=",
+      "src/lib/products.ts?tsr-directive-use-server=",
       "src/lib/session.ts?tsr-directive-use-server=",
       "src/lib/session.ts?tsr-directive-use-server=",
       "src/lib/session.ts?tsr-directive-use-server=",
@@ -147,20 +147,20 @@
     ]
   },
   "src/app.tsx": {
-    "file": "assets/app-DdXtN6Nq.js",
+    "file": "assets/app-C76_G7l3.js",
     "name": "app",
     "src": "src/app.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_index-Dps0aSs2.js",
-      "_server-fns-DSWMe6uF.js",
+      "_server-fns-Dijjw6ZU.js",
       "_Loading-b-bAnbUN.js",
       "_routing-CMRlbYJP.js",
       "_action-CnXm9LBs.js",
       "_fetchEvent-CIpVWTXg.js"
     ],
     "css": [
-      "assets/app-WNa2LR0V.css"
+      "assets/app-COWpUkC8.css"
     ]
   },
   "src/components/BarcodeScanner.tsx": {
@@ -540,7 +540,7 @@
     "src": "virtual:$vinxi/handler/server-fns",
     "isEntry": true,
     "imports": [
-      "_server-fns-DSWMe6uF.js",
+      "_server-fns-Dijjw6ZU.js",
       "_fetchEvent-CIpVWTXg.js"
     ]
   }
