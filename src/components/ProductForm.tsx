@@ -1,7 +1,8 @@
 
 import { createSignal, Show } from "solid-js";
 import { NewProduct, Product } from "~/lib/products";
-import BarcodeScanner from "./BarcodeScanner";
+import { clientOnly } from "@solidjs/start";
+const BarcodeScanner = clientOnly(() => import("./BarcodeScanner"));
 import { productSchema, ProductInput } from "~/lib/validations";
 import { Input } from "./ui/Input";
 import { Select } from "./ui/Select";
