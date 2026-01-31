@@ -3,6 +3,6 @@
 .env
 .env*.local
 
-# dependencies
+# dependencies test
 /node_modules
 
