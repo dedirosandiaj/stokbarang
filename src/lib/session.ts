@@ -9,7 +9,14 @@ const SESSION_COOKIE_NAME = "session";
 
 export async function getUser() {
     try {
-        const event = getEvent();
+        let event;
+        try {
+            event = getEvent();
+        } catch (e) {
+            // No request context available (e.g. during build/static generation)
+            return null;
+        }
+
         const sessionId = getCookie(event, SESSION_COOKIE_NAME);
         console.log(`[Session] getUser found cookie: ${sessionId ? "YES" : "NO"} (${sessionId})`);
 
