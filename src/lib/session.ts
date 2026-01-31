@@ -1,3 +1,4 @@
+"use server";
 
 import { getEvent, setCookie, getCookie, deleteCookie } from "vinxi/http";
 import { db } from "~/db";
