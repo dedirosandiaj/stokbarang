@@ -11,7 +11,7 @@ export default function App() {
       root={props => (
         <MetaProvider>
           <Title>SolidStart - Basic</Title>
-          <ErrorBoundary fallback={(err) => (
+          <ErrorBoundary fallback={(err: any) => (
             <div class="p-4 bg-red-50 text-red-900 min-h-screen">
               <h1 class="text-2xl font-bold mb-2">Application Error</h1>
               <pre class="whitespace-pre-wrap overflow-auto p-4 bg-red-100 rounded text-sm">
