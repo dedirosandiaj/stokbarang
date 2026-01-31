@@ -1,0 +1,1 @@
+import{ssr as e,ssrHydrationKey as r}from"solid-js/web";var i=["<div",' class="fixed inset-0 flex items-center justify-center bg-white bg-opacity-75 z-50"><div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div></div>'];function s(){return e(i,r())}export{s as L};

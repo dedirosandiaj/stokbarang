@@ -1,0 +1,1 @@
+import{i,q as n,l,b as o,t as m}from"./web-B77D8VL7.js";import{T as s}from"./index-D0gPe-Qg.js";var u=m("<main><!$><!/><h1>About");function $(){return(()=>{var t=i(u),r=t.firstChild,[e,a]=n(r.nextSibling);return e.nextSibling,l(t,o(s,{children:"About"}),e,a),t})()}export{$ as default};

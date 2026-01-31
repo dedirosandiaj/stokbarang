@@ -1,0 +1,1 @@
+import{createComponent as r}from"solid-js/web";import{N as o}from"./assets/components-2Zj0uUoj.js";import"solid-js";import"./assets/routing-CMRlbYJP.js";function m(){return r(o,{href:"/dashboard"})}export{m as default};

@@ -1,0 +1,281 @@
+import { useContext, createMemo, createContext, createSignal, createRenderEffect, on, runWithOwner, getOwner, startTransition, resetErrorBoundaries, batch, untrack, createComponent } from 'solid-js';
+import { isServer, getRequestEvent } from 'solid-js/web';
+
+function ye() {
+  let t = /* @__PURE__ */ new Set();
+  function e(r) {
+    return t.add(r), () => t.delete(r);
+  }
+  let n = false;
+  function s(r, o) {
+    if (n) return !(n = false);
+    const a = { to: r, options: o, defaultPrevented: false, preventDefault: () => a.defaultPrevented = true };
+    for (const c of t) c.listener({ ...a, from: c.location, retry: (f) => {
+      f && (n = true), c.navigate(r, { ...o, resolve: false });
+    } });
+    return !a.defaultPrevented;
+  }
+  return { subscribe: e, confirm: s };
+}
+let D;
+function V() {
+  (!window.history.state || window.history.state._depth == null) && window.history.replaceState({ ...window.history.state, _depth: window.history.length - 1 }, ""), D = window.history.state._depth;
+}
+isServer || V();
+function Ie(t) {
+  return { ...t, _depth: window.history.state && window.history.state._depth };
+}
+function qe(t, e) {
+  let n = false;
+  return () => {
+    const s = D;
+    V();
+    const r = s == null ? null : D - s;
+    if (n) {
+      n = false;
+      return;
+    }
+    r && e(r) ? (n = true, window.history.go(-r)) : t();
+  };
+}
+const we = /^(?:[a-z0-9]+:)?\/\//i, ve = /^\/+|(\/)\/+$/g, Re = "http://sr";
+function L(t, e = false) {
+  const n = t.replace(ve, "$1");
+  return n ? e || /^[?#]/.test(n) ? n : "/" + n : "";
+}
+function W(t, e, n) {
+  if (we.test(e)) return;
+  const s = L(t), r = n && L(n);
+  let o = "";
+  return !r || e.startsWith("/") ? o = s : r.toLowerCase().indexOf(s.toLowerCase()) !== 0 ? o = s + r : o = r, (o || "/") + L(e, !o);
+}
+function Pe(t, e) {
+  if (t == null) throw new Error(e);
+  return t;
+}
+function xe(t, e) {
+  return L(t).replace(/\/*(\*.*)?$/g, "") + L(e);
+}
+function Y(t) {
+  const e = {};
+  return t.searchParams.forEach((n, s) => {
+    s in e ? Array.isArray(e[s]) ? e[s].push(n) : e[s] = [e[s], n] : e[s] = n;
+  }), e;
+}
+function be(t, e, n) {
+  const [s, r] = t.split("/*", 2), o = s.split("/").filter(Boolean), a = o.length;
+  return (c) => {
+    const f = c.split("/").filter(Boolean), h = f.length - a;
+    if (h < 0 || h > 0 && r === void 0 && !e) return null;
+    const l = { path: a ? "" : "/", params: {} }, m = (d) => n === void 0 ? void 0 : n[d];
+    for (let d = 0; d < a; d++) {
+      const p = o[d], y = p[0] === ":", v = y ? f[d] : f[d].toLowerCase(), F = y ? p.slice(1) : p.toLowerCase();
+      if (y && $(v, m(F))) l.params[F] = v;
+      else if (y || !$(v, F)) return null;
+      l.path += `/${v}`;
+    }
+    if (r) {
+      const d = h ? f.slice(-h).join("/") : "";
+      if ($(d, m(r))) l.params[r] = d;
+      else return null;
+    }
+    return l;
+  };
+}
+function $(t, e) {
+  const n = (s) => s === t;
+  return e === void 0 ? true : typeof e == "string" ? n(e) : typeof e == "function" ? e(t) : Array.isArray(e) ? e.some(n) : e instanceof RegExp ? e.test(t) : false;
+}
+function Ae(t) {
+  const [e, n] = t.pattern.split("/*", 2), s = e.split("/").filter(Boolean);
+  return s.reduce((r, o) => r + (o.startsWith(":") ? 2 : 3), s.length - (n === void 0 ? 0 : 1));
+}
+function Z(t) {
+  const e = /* @__PURE__ */ new Map(), n = getOwner();
+  return new Proxy({}, { get(s, r) {
+    return e.has(r) || runWithOwner(n, () => e.set(r, createMemo(() => t()[r]))), e.get(r)();
+  }, getOwnPropertyDescriptor() {
+    return { enumerable: true, configurable: true };
+  }, ownKeys() {
+    return Reflect.ownKeys(t());
+  }, has(s, r) {
+    return r in t();
+  } });
+}
+function ee(t) {
+  let e = /(\/?\:[^\/]+)\?/.exec(t);
+  if (!e) return [t];
+  let n = t.slice(0, e.index), s = t.slice(e.index + e[0].length);
+  const r = [n, n += e[1]];
+  for (; e = /^(\/\:[^\/]+)\?/.exec(s); ) r.push(n += e[1]), s = s.slice(e[0].length);
+  return ee(s).reduce((o, a) => [...o, ...r.map((c) => c + a)], []);
+}
+const Ce = 100, Ee = createContext(), te = createContext(), E = () => Pe(useContext(Ee), "<A> and 'use' router primitives can be only used inside a Route."), Fe = () => useContext(te) || E().base, We = (t) => {
+  const e = Fe();
+  return createMemo(() => e.resolvePath(t()));
+}, $e = (t) => {
+  const e = E();
+  return createMemo(() => {
+    const n = t();
+    return n !== void 0 ? e.renderPath(n) : n;
+  });
+}, Me = () => E().navigatorFactory(), De = () => E().location, Ue = () => E().isRouting, ze = () => E().params;
+function Le(t, e = "") {
+  const { component: n, preload: s, load: r, children: o, info: a } = t, c = !o || Array.isArray(o) && !o.length, f = { key: t, component: n, preload: s || r, info: a };
+  return ne(t.path).reduce((h, l) => {
+    for (const m of ee(l)) {
+      const d = xe(e, m);
+      let p = c ? d : d.split("/*", 1)[0];
+      p = p.split("/").map((y) => y.startsWith(":") || y.startsWith("*") ? y : encodeURIComponent(y)).join("/"), h.push({ ...f, originalPath: l, pattern: p, matcher: be(p, !c, t.matchFilters) });
+    }
+    return h;
+  }, []);
+}
+function Se(t, e = 0) {
+  return { routes: t, score: Ae(t[t.length - 1]) * 1e4 - e, matcher(n) {
+    const s = [];
+    for (let r = t.length - 1; r >= 0; r--) {
+      const o = t[r], a = o.matcher(n);
+      if (!a) return null;
+      s.unshift({ ...a, route: o });
+    }
+    return s;
+  } };
+}
+function ne(t) {
+  return Array.isArray(t) ? t : [t];
+}
+function Oe(t, e = "", n = [], s = []) {
+  const r = ne(t);
+  for (let o = 0, a = r.length; o < a; o++) {
+    const c = r[o];
+    if (c && typeof c == "object") {
+      c.hasOwnProperty("path") || (c.path = "");
+      const f = Le(c, e);
+      for (const h of f) {
+        n.push(h);
+        const l = Array.isArray(c.children) && c.children.length === 0;
+        if (c.children && !l) Oe(c.children, h.pattern, n, s);
+        else {
+          const m = Se([...n], s.length);
+          s.push(m);
+        }
+        n.pop();
+      }
+    }
+  }
+  return n.length ? s : s.sort((o, a) => a.score - o.score);
+}
+function M(t, e) {
+  for (let n = 0, s = t.length; n < s; n++) {
+    const r = t[n].matcher(e);
+    if (r) return r;
+  }
+  return [];
+}
+function _e(t, e, n) {
+  const s = new URL(Re), r = createMemo((l) => {
+    const m = t();
+    try {
+      return new URL(m, s);
+    } catch {
+      return console.error(`Invalid path ${m}`), l;
+    }
+  }, s, { equals: (l, m) => l.href === m.href }), o = createMemo(() => r().pathname), a = createMemo(() => r().search, true), c = createMemo(() => r().hash), f = () => "", h = on(a, () => Y(r()));
+  return { get pathname() {
+    return o();
+  }, get search() {
+    return a();
+  }, get hash() {
+    return c();
+  }, get state() {
+    return e();
+  }, get key() {
+    return f();
+  }, query: n ? n(h) : Z(h) };
+}
+let R;
+function He() {
+  return R;
+}
+let C = false;
+function Ke() {
+  return C;
+}
+function Ne(t) {
+  C = t;
+}
+function Te(t, e, n, s = {}) {
+  const { signal: [r, o], utils: a = {} } = t, c = a.parsePath || ((i) => i), f = a.renderPath || ((i) => i), h = a.beforeLeave || ye(), l = W("", s.base || "");
+  if (l === void 0) throw new Error(`${l} is not a valid base path`);
+  l && !r().value && o({ value: l, replace: true, scroll: false });
+  const [m, d] = createSignal(false);
+  let p;
+  const y = (i, u) => {
+    u.value === v() && u.state === S() || (p === void 0 && d(true), R = i, p = u, startTransition(() => {
+      p === u && (F(p.value), re(p.state), resetErrorBoundaries(), isServer || z[1]((g) => g.filter((P) => P.pending)));
+    }).finally(() => {
+      p === u && batch(() => {
+        R = void 0, i === "navigate" && ie(p), d(false), p = void 0;
+      });
+    }));
+  }, [v, F] = createSignal(r().value), [S, re] = createSignal(r().state), O = _e(v, S, a.queryWrapper), _ = [], z = createSignal(isServer ? ue() : []), H = createMemo(() => typeof s.transformUrl == "function" ? M(e(), s.transformUrl(O.pathname)) : M(e(), O.pathname)), K = () => {
+    const i = H(), u = {};
+    for (let g = 0; g < i.length; g++) Object.assign(u, i[g].params);
+    return u;
+  }, se = a.paramsWrapper ? a.paramsWrapper(K, e) : Z(K), N = { pattern: l, path: () => l, outlet: () => null, resolvePath(i) {
+    return W(l, i);
+  } };
+  return createRenderEffect(on(r, (i) => y("native", i), { defer: true })), { base: N, location: O, params: se, isRouting: m, renderPath: f, parsePath: c, navigatorFactory: ae, matches: H, beforeLeave: h, preloadRoute: ce, singleFlight: s.singleFlight === void 0 ? true : s.singleFlight, submissions: z };
+  function oe(i, u, g) {
+    untrack(() => {
+      if (typeof u == "number") {
+        u && (a.go ? a.go(u) : console.warn("Router integration does not support relative routing"));
+        return;
+      }
+      const P = !u || u[0] === "?", { replace: j, resolve: x, scroll: B, state: b } = { replace: false, resolve: !P, scroll: true, ...g }, A = x ? i.resolvePath(u) : W(P && O.pathname || "", u);
+      if (A === void 0) throw new Error(`Path '${u}' is not a routable path`);
+      if (_.length >= Ce) throw new Error("Too many redirects");
+      const T = v();
+      if (A !== T || b !== S()) if (isServer) {
+        const k = getRequestEvent();
+        k && (k.response = { status: 302, headers: new Headers({ Location: A }) }), o({ value: A, replace: j, scroll: B, state: b });
+      } else h.confirm(A, g) && (_.push({ value: T, replace: j, scroll: B, state: S() }), y("navigate", { value: A, state: b }));
+    });
+  }
+  function ae(i) {
+    return i = i || useContext(te) || N, (u, g) => oe(i, u, g);
+  }
+  function ie(i) {
+    const u = _[0];
+    u && (o({ ...i, replace: u.replace, scroll: u.scroll }), _.length = 0);
+  }
+  function ce(i, u) {
+    const g = M(e(), i.pathname), P = R;
+    R = "preload";
+    for (let j in g) {
+      const { route: x, params: B } = g[j];
+      x.component && x.component.preload && x.component.preload();
+      const { preload: b } = x;
+      C = true, u && b && runWithOwner(n(), () => b({ params: B, location: { pathname: i.pathname, search: i.search, hash: i.hash, query: Y(i), state: null, key: "" }, intent: "preload" })), C = false;
+    }
+    R = P;
+  }
+  function ue() {
+    const i = getRequestEvent();
+    return i && i.router && i.router.submission ? [i.router.submission] : [];
+  }
+}
+function ke(t, e, n, s) {
+  const { base: r, location: o, params: a } = t, { pattern: c, component: f, preload: h } = s().route, l = createMemo(() => s().path);
+  f && f.preload && f.preload(), C = true;
+  const m = h ? h({ params: a, location: o, intent: R || "initial" }) : void 0;
+  return C = false, { parent: e, pattern: c, path: l, outlet: () => f ? createComponent(f, { params: a, location: o, data: m, get children() {
+    return n();
+  } }) : n(), resolvePath(p) {
+    return W(r.path(), p, l());
+  } };
+}
+
+export { $e as $, De as D, Ee as E, He as H, Ie as I, Ke as K, L, Me as M, Ne as N, Oe as O, Re as R, Te as T, Ue as U, V, We as W, M as a, E as b, ke as k, qe as q, te as t, ye as y, ze as z };
+//# sourceMappingURL=routing-CMRlbYJP.mjs.map
