@@ -17,6 +17,7 @@
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.1",
     "drizzle-zod": "^0.8.3",
+    "h3": "^2.0.1-rc.11",
     "html5-qrcode": "^2.3.8",
     "postgres": "^3.4.8",
     "solid-js": "^1.9.5",
